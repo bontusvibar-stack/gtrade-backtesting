@@ -11,6 +11,7 @@ import { EquityChart, DrawdownChart } from "@/components/backtest/equity-chart";
 import { TradeTable } from "@/components/backtest/trade-table";
 import { createClient } from "@/lib/supabase/client";
 import { saveBacktestResult } from "@/lib/backtesting/persistence";
+import { generateDemoCandles } from "@/lib/market-data/demo";
 
 export interface DatasetOption {
   id: string;
@@ -94,6 +95,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [demoCreating, setDemoCreating] = useState(false);
   const [showConfig, setShowConfig] = useState(true);
   const [showMetrics, setShowMetrics] = useState(true);
   const [bottomTab, setBottomTab] = useState<"trades" | "equity" | "drawdown" | "stats">("trades");
@@ -221,8 +223,43 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
                   <div className="border-b border-amber-500/20 bg-amber-500/10 px-3 py-2.5">
                     <p className="text-xs font-medium text-amber-200">Belum ada dataset</p>
                     <p className="mt-1 text-xs leading-relaxed text-amber-200/70">
-                      Buka <a href="/market-data" className="underline">Market Data</a> → Generate Demo (mis. DEMOUSD 1h) atau Import CSV, lalu kembali ke sini.
+                      Klik tombol di bawah untuk buat data demo instan, atau buka <a href="/market-data" className="underline">Market Data</a> untuk Import CSV.
                     </p>
+                    <button
+                      disabled={demoCreating}
+                      onClick={async () => {
+                        setDemoCreating(true);
+                        setError(null);
+                        try {
+                          const supabase = createClient();
+                          const {
+                            data: { user },
+                          } = await supabase.auth.getUser();
+                          if (!user) throw new Error("Belum login.");
+                          const candles = generateDemoCandles("DEMOUSD", "1h", 1000);
+                          const { error } = await supabase.from("market_data_sets").insert({
+                            user_id: user.id,
+                            symbol: "DEMOUSD",
+                            market_type: "demo",
+                            timeframe: "1h",
+                            candle_count: candles.length,
+                            start_time: new Date(candles[0].timestamp).toISOString(),
+                            end_time: new Date(candles[candles.length - 1].timestamp).toISOString(),
+                            is_demo: true,
+                            metadata: { candles, source: "demo-inline" },
+                          });
+                          if (error) throw new Error(error.message);
+                          window.location.reload();
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Gagal buat demo.");
+                        } finally {
+                          setDemoCreating(false);
+                        }
+                      }}
+                      className="mt-2 w-full rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 disabled:opacity-60"
+                    >
+                      {demoCreating ? "Membuat…" : "Buat DEMO 1h Sekarang (1 klik)"}
+                    </button>
                   </div>
                 )}
 
@@ -332,12 +369,35 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className={`${cardCls} p-2`}>
             {!result ? (
-              <div className="flex h-[420px] flex-col items-center justify-center gap-3 px-6 text-center">
-                <p className="text-sm font-medium text-white/70">Belum ada hasil</p>
-                <p className="max-w-sm text-xs leading-relaxed text-white/35">
-                  Pilih <span className="text-white/60">Long & Hold (Test)</span> untuk test LONG instan, atau SMA/RSI/Breakout. Pastikan ada dataset — jika kosong buat di Market Data dulu.
-                </p>
-                <button onClick={onRun} className="rounded-md bg-white px-4 py-1.5 text-sm font-semibold text-black">Run Backtest</button>
+              <div className="flex min-h-[420px] flex-col gap-3 p-4">
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
+                  <p className="text-xs font-semibold tracking-wide text-white/80">Cara entry LONG (3 langkah)</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-lg bg-white/[0.04] p-2.5">
+                      <p className="text-[10px] font-bold tracking-widest text-white/30">LANGKAH 1</p>
+                      <p className="mt-1 text-xs font-medium text-white">Punya Dataset</p>
+                      <p className="text-xs leading-relaxed text-white/40">Kiri → jika ada kotak kuning, klik <span className="text-amber-200">Buat DEMO</span> (1 klik). Atau Market Data → Generate.</p>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.04] p-2.5">
+                      <p className="text-[10px] font-bold tracking-widest text-white/30">LANGKAH 2</p>
+                      <p className="mt-1 text-xs font-medium text-white">Pilih LONG</p>
+                      <p className="text-xs leading-relaxed text-white/40">Kiri → Strategy = <span className="text-emerald-200">Long & Hold (Test)</span> (sudah default). Ini langsung BUY di candle pertama.</p>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.04] p-2.5">
+                      <p className="text-[10px] font-bold tracking-widest text-white/30">LANGKAH 3</p>
+                      <p className="mt-1 text-xs font-medium text-white">Run</p>
+                      <p className="text-xs leading-relaxed text-white/40">Klik tombol putih <span className="text-white">Run Backtest</span> di kanan atas. Chart + Trades muncul di bawah.</p>
+                    </div>
+                  </div>
+                  <button onClick={onRun} className="mt-3 w-full rounded-md bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
+                    ▶ Run Long & Hold Sekarang
+                  </button>
+                  <p className="mt-2 text-center text-[10px] text-white/25">Setelah Run: lihat panah hijau B di chart = entry LONG.</p>
+                </div>
+                <div className="flex-1 rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3">
+                  <p className="text-xs font-medium text-white/50">Preview chart (akan terrender setelah Run)</p>
+                  <div className="mt-2 h-24 rounded bg-gradient-to-r from-emerald-500/10 via-white/[0.03] to-red-500/10" />
+                </div>
               </div>
             ) : (
               <CandlestickChart candles={candles} trades={result.trades} />

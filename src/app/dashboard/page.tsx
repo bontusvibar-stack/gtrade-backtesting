@@ -11,104 +11,143 @@ export default async function DashboardPage() {
 
   const { data: lastRun } = await supabase
     .from("backtest_runs")
-    .select("id, created_at, backtest_results(net_pnl, total_return, win_rate, trade_count), backtest_configs(symbol, timeframe)")
+    .select("id, created_at, backtest_results(net_pnl, total_return, win_rate, trade_count, profit_factor, sharpe, max_drawdown_pct), backtest_configs(symbol, timeframe)")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const { count: dsCount } = await supabase
-    .from("market_data_sets")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id);
-
-  const { count: runCount } = await supabase
+  const { count: dsCount } = await supabase.from("market_data_sets").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+  const { count: runCount } = await supabase.from("backtest_runs").select("id", { count: "exact", head: true }).eq("user_id", user.id);
+  const { data: recentRuns } = await supabase
     .from("backtest_runs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id);
+    .select("id, created_at, backtest_configs(symbol, timeframe), backtest_results(net_pnl, trade_count)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(3);
 
   const res = (lastRun as Record<string, unknown> | null)?.backtest_results as
-    | { net_pnl: number; total_return: number | null; win_rate: number | null; trade_count: number }[]
+    | { net_pnl: number; total_return: number | null; win_rate: number | null; trade_count: number; profit_factor: number | null; sharpe: number | null; max_drawdown_pct: number | null }[]
     | undefined;
+  const m = res?.[0];
+  const cfg = (lastRun as Record<string, unknown> | null)?.backtest_configs as { symbol: string; timeframe: string }[] | undefined;
 
-  const metrics = res?.[0] as
-    | { net_pnl: number; total_return: number | null; win_rate: number | null; trade_count: number }
-    | undefined;
-
-  const cfg = (lastRun as Record<string, unknown> | null)?.backtest_configs as
-    | { symbol: string; timeframe: string }[]
-    | undefined;
+  const hasData = !!lastRun && !!m;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 py-8">
-      <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
-      <p className="text-sm text-muted-foreground">Signed in as {user.email ?? "unknown"}.</p>
+    <div className="mx-auto max-w-6xl space-y-3 px-4 py-6">
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-xs text-white/40">Signed in as {user.email} · premium dark terminal</p>
+        </div>
+        <Link href="/backtest" className="rounded-md bg-white px-3.5 py-1.5 text-sm font-semibold text-black hover:bg-white/90">
+          New Backtest →
+        </Link>
+      </div>
 
       {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        <Link href="/backtest" className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground">
-          New Backtest
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Link href="/backtest" className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:bg-white/[0.04]">
+          <p className="text-xs font-semibold text-white">New Backtest</p>
+          <p className="mt-1 text-xs text-white/40">Pilih dataset + LONG</p>
         </Link>
-        <Link href="/market-data" className="rounded-md border border-border bg-card px-4 py-1.5 text-sm">
-          Import Market Data
+        <Link href="/market-data" className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:bg-white/[0.04]">
+          <p className="text-xs font-semibold text-white">Market Data</p>
+          <p className="mt-1 text-xs text-white/40">Import CSV / Demo</p>
         </Link>
-        <Link href="/strategies" className="rounded-md border border-border bg-card px-4 py-1.5 text-sm">
-          Strategies
+        <Link href="/strategies" className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:bg-white/[0.04]">
+          <p className="text-xs font-semibold text-white">Strategies</p>
+          <p className="mt-1 text-xs text-white/40">4 demo + custom</p>
         </Link>
-        <Link href="/results" className="rounded-md border border-border bg-card px-4 py-1.5 text-sm">
-          View Results
+        <Link href="/results" className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:bg-white/[0.04]">
+          <p className="text-xs font-semibold text-white">Results</p>
+          <p className="mt-1 text-xs text-white/40">{runCount ?? 0} saved</p>
         </Link>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Datasets</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">{dsCount ?? 0}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Saved runs</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">{runCount ?? 0}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Last net P&L</p>
-          <p className={`mt-1 font-mono text-lg font-semibold tabular-nums ${Number(metrics?.net_pnl ?? 0) >= 0 ? "text-chart-1" : "text-loss"}`}>
-            {metrics ? Number(metrics.net_pnl).toFixed(2) : "—"}
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Last win rate</p>
-          <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
-            {metrics?.win_rate !== null && metrics?.win_rate !== undefined ? `${Number(metrics.win_rate).toFixed(1)}%` : "—"}
-          </p>
-        </div>
-      </div>
-
-      {/* Last run */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="text-sm font-semibold">Recent activity</h2>
-        {!lastRun ? (
-          <p className="mt-2 text-sm text-muted-foreground">
-            No backtest runs yet. Create a dataset and run a backtest to see activity here.
-          </p>
-        ) : (
-          <div className="mt-2 space-y-1 text-sm">
-            <p>
-              Last run {String((lastRun as Record<string, unknown>).id).slice(0, 8)} · {new Date(String((lastRun as Record<string, unknown>).created_at)).toISOString().slice(0, 16).replace("T", " ")}
-              {cfg?.[0] ? ` · ${cfg[0].symbol} ${cfg[0].timeframe}` : ""}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Net {metrics?.net_pnl ?? "—"} · Return {metrics?.total_return !== null && metrics?.total_return !== undefined ? `${Number(metrics.total_return).toFixed(2)}%` : "—"} · Trades{" "}
-              {metrics?.trade_count ?? "—"}
-            </p>
-            <Link href="/results" className="text-xs text-primary underline">
-              View all results
-            </Link>
+      {/* Account summary */}
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { k: "Datasets", v: String(dsCount ?? 0), sub: "di Market Data" },
+          { k: "Saved runs", v: String(runCount ?? 0), sub: "di Results" },
+          { k: "Last P&L", v: m ? Number(m.net_pnl).toFixed(2) : "—", tone: Number(m?.net_pnl ?? 0) >= 0 ? "profit" : "loss", sub: cfg?.[0] ? `${cfg[0].symbol} ${cfg[0].timeframe}` : "belum ada" },
+          { k: "Win Rate", v: m?.win_rate !== null && m?.win_rate !== undefined ? `${Number(m.win_rate).toFixed(1)}%` : "—", sub: m ? `${m.trade_count} trades` : "—" },
+        ].map((c) => (
+          <div key={c.k} className="rounded-xl border border-white/[0.07] bg-[#151515] p-3">
+            <p className="text-[10px] uppercase tracking-widest text-white/35">{c.k}</p>
+            <p className={`mt-1 font-mono text-base font-semibold tabular-nums ${c.tone === "profit" ? "text-emerald-400" : c.tone === "loss" ? "text-red-400" : "text-white"}`}>{c.v}</p>
+            <p className="text-xs text-white/30">{c.sub}</p>
           </div>
-        )}
+        ))}
       </div>
 
-      <p className="text-[10px] text-muted-foreground">Historical backtesting does not guarantee future performance.</p>
+      {/* Performance */}
+      <div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3">
+        <h2 className="text-xs font-semibold tracking-wide text-white/70">Performance</h2>
+        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {[
+            { k: "Return", v: m?.total_return !== null && m?.total_return !== undefined ? `${Number(m.total_return).toFixed(2)}%` : "—" },
+            { k: "PF", v: m?.profit_factor !== null && m?.profit_factor !== undefined ? Number(m.profit_factor).toFixed(2) : "—" },
+            { k: "Sharpe", v: m?.sharpe !== null && m?.sharpe !== undefined ? Number(m.sharpe).toFixed(2) : "—" },
+            { k: "Max DD", v: m?.max_drawdown_pct !== null && m?.max_drawdown_pct !== undefined ? `${Number(m.max_drawdown_pct).toFixed(1)}%` : "—" },
+            { k: "Trades", v: m ? String(m.trade_count) : "—" },
+            { k: "Engine", v: hasData ? "v0.1.0" : "—" },
+          ].map((x) => (
+            <div key={x.k} className="rounded-lg bg-white/[0.04] px-2.5 py-2">
+              <p className="text-[10px] uppercase tracking-wide text-white/30">{x.k}</p>
+              <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums text-white/80">{x.v}</p>
+            </div>
+          ))}
+        </div>
+        {!hasData && <p className="mt-2 text-xs text-white/25">Jalankan backtest sekali untuk mengisi panel ini.</p>}
+      </div>
+
+      {/* Charts placeholder + Recent */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 lg:col-span-2">
+          <h2 className="text-xs font-semibold tracking-wide text-white/70">Equity · Drawdown · Monthly</h2>
+          {!hasData ? (
+            <div className="mt-3 grid gap-2">
+              <div className="h-24 rounded-lg bg-white/[0.03] p-2">
+                <div className="h-full w-full rounded bg-gradient-to-r from-emerald-500/10 via-white/[0.04] to-transparent" />
+                <p className="mt-1 text-center text-xs text-white/25">Equity curve muncul setelah Run Backtest</p>
+              </div>
+              <div className="h-16 rounded-lg bg-white/[0.03] p-2">
+                <div className="h-full w-full rounded bg-gradient-to-r from-red-500/10 via-white/[0.04] to-transparent" />
+              </div>
+              <div className="grid grid-cols-8 gap-1">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-8 rounded bg-white/[0.04]" />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-white/40">Lihat Analytics untuk equity/drawdown/monthly penuh.</p>
+          )}
+          <Link href="/analytics" className="mt-2 inline-block text-xs text-white/50 underline hover:text-white">
+            Open Analytics →
+          </Link>
+        </div>
+
+        <div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3">
+          <h2 className="text-xs font-semibold tracking-wide text-white/70">Recent backtests</h2>
+          {!recentRuns || recentRuns.length === 0 ? (
+            <p className="mt-2 text-sm text-white/30">Belum ada. Klik New Backtest → pilih Long & Hold → Run.</p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {(recentRuns as unknown as { id: string; created_at: string; backtest_configs: { symbol: string; timeframe: string }[] | null; backtest_results: { net_pnl: number }[] | null }[]).map((r) => (
+                <Link key={r.id} href={`/results/${r.id}`} className="flex items-center justify-between rounded-lg bg-white/[0.04] px-2.5 py-2 hover:bg-white/[0.07]">
+                  <span className="text-xs font-mono text-white/60">{r.id.slice(0, 6)} · {r.backtest_configs?.[0]?.symbol ?? "—"}</span>
+                  <span className={`text-xs font-mono tabular-nums ${Number(r.backtest_results?.[0]?.net_pnl ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{r.backtest_results?.[0] ? Number(r.backtest_results[0].net_pnl).toFixed(0) : "—"}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <p className="text-[10px] text-white/20">Historical backtesting does not guarantee future performance.</p>
     </div>
   );
 }
