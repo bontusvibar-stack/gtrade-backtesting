@@ -9,6 +9,7 @@ import { MetricsPanel } from "@/components/backtest/metrics-panel";
 import { EquityChart, DrawdownChart } from "@/components/backtest/equity-chart";
 import { TradeTable } from "@/components/backtest/trade-table";
 import { createClient } from "@/lib/supabase/client";
+import { saveBacktestResult } from "@/lib/backtesting/persistence";
 
 export interface DatasetOption {
   id: string;
@@ -66,8 +67,12 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
   const [executionModel, setExecutionModel] = useState<"close" | "next_open">("next_open");
 
   const [result, setResult] = useState<RunResult | null>(null);
+  const [lastConfig, setLastConfig] = useState<BacktestConfig | null>(null);
+  const [lastMarketDataSetId, setLastMarketDataSetId] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [running, setRunning] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const dataset = useMemo(
@@ -129,6 +134,9 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
       const run = runBacktest(config, dsCandles, strategy);
       setCandles(dsCandles);
       setResult(run);
+      setLastConfig(config);
+      setLastMarketDataSetId(datasetId);
+      setSavedId(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Backtest failed.");
     } finally {
@@ -237,6 +245,83 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
       {/* Results */}
       {result && (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={async () => {
+                if (!lastConfig || !result) return;
+                setSaving(true);
+                setError(null);
+                try {
+                  const supabase = createClient();
+                  const id = await saveBacktestResult(supabase, {
+                    config: lastConfig,
+                    candlesMeta: {
+                      symbol: lastConfig.symbol,
+                      timeframe: lastConfig.timeframe,
+                      candleCount: candles.length,
+                    },
+                    marketDataSetId: lastMarketDataSetId,
+                    result,
+                  });
+                  setSavedId(id);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Save failed.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              disabled={saving || !!savedId}
+              className="rounded-md border border-border bg-card px-4 py-1.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              {savedId ? "Saved ✓" : saving ? "Saving…" : "Save Result"}
+            </button>
+            {savedId && (
+              <a href={`/results/${savedId}`} className="text-sm text-primary underline">
+                View saved result
+              </a>
+            )}
+            <button
+              onClick={() => {
+                const blob = new Blob(
+                  [JSON.stringify({ config: lastConfig, result }, null, 2)],
+                  { type: "application/json" },
+                );
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `backtest-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="rounded-md border border-border bg-card px-4 py-1.5 text-sm transition-colors hover:bg-accent"
+            >
+              Export JSON
+            </button>
+            <button
+              onClick={() => {
+                const headers =
+                  "id,symbol,side,entryTime,exitTime,entryPrice,exitPrice,quantity,netPnl,rMultiple,exitReason";
+                const rows = result.trades
+                  .map(
+                    (t) =>
+                      `${t.id},${t.symbol},${t.side},${t.entryTime},${t.exitTime ?? ""},${t.entryPrice},${t.exitPrice ?? ""},${t.quantity},${t.netPnl},${t.rMultiple},${t.exitReason ?? ""}`,
+                  )
+                  .join("\n");
+                const csv = headers + "\n" + rows;
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `trades-${Date.now()}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="rounded-md border border-border bg-card px-4 py-1.5 text-sm transition-colors hover:bg-accent"
+            >
+              Export CSV
+            </button>
+          </div>
+
           <div>
             <h2 className="mb-2 text-sm font-semibold">Metrics</h2>
             <MetricsPanel m={result.metrics} />
