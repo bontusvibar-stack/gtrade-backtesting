@@ -1,0 +1,19 @@
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+
+export interface NavItem {
+  href: string;
+  label: string;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/backtest", label: "Backtest" },
+  { href: "/strategies", label: "Strategies" },
+  { href: "/market-data", label: "Market Data" },
+  { href: "/results", label: "Results" },
+  { href: "/compare", label: "Compare" },
+  { href: "/optimize", label: "Optimize" },
+  { href: "/analytics", label: "Analytics" },
+  { href: "/settings", label: "Settings" },
+];
