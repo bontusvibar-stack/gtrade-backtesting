@@ -1,54 +1,160 @@
 # Metric Formulas
 
-> **STATUS: SPEC TO BE IMPLEMENTED IN PHASE 3.** These formulas define the metrics the Metrics Engine must produce. They are the contract; implementation lives in `src/lib/backtesting` / `src/lib/calculations` during Phase 3.
+This document specifies every metric computed by the backtest engine in
+`src/lib/calculations/metrics.ts` (function `computeMetrics`). All formulas are
+unit-tested in `tests/unit/calculations.test.ts`.
 
-Notation:
-- `E[i]` = equity at point i; `E[0]` = starting capital.
-- `R[i]` = return of period i = `E[i]/E[i-1] - 1`.
-- `T` = a closed trade; `pnl(T)` = profit/loss of trade; `r(T)` = R-multiple of trade.
-- `W` = winning trades; `L` = losing trades.
+The engine accepts a `MetricsInput`:
 
-## Net Profit
-`Net Profit = sum(pnl(T) for all T) = E[final] - E[0]`
+- `trades` — array of closed trades, each with `netPnl`, `grossPnl`,
+  `commission`, `slippage`, `rMultiple`, `side`, `entryTime`, `exitTime`,
+  `exitReason`.
+- `startingBalance` — initial account equity.
+- `equityCurve` — equity value recorded after each candle (defaults to
+  `[startingBalance]` if empty).
+- `annualizationFactor` — defaults to `252`.
 
-## Total Return
-`Total Return % = (E[final] / E[0] - 1) * 100`
+Helper definitions used throughout:
 
-## Win Rate
-`Win Rate % = (count(W) / (count(W) + count(L))) * 100`
+- `wins` = trades with `netPnl > 0`
+- `losses` = trades with `netPnl <= 0`
+- `curve` = `equityCurve` (or `[startingBalance]` if empty)
+- `endingBalance` = last value of `curve`
 
-## Profit Factor
-`Profit Factor = sum(pnl(T)) for W / abs(sum(pnl(T)) for L)`
-(If losers sum to 0, Profit Factor = infinity.)
+---
 
-## Expectancy
-`Expectancy = (Win Rate * Avg Win) + ((1 - Win Rate) * Avg Loss)`
-where Avg Win/Loss are mean pnl per trade.
+## Balance Metrics
 
-## Average R
-`Average R = mean(r(T))` over all closed trades, where `r(T) = pnl(T) / risk(T)` and `risk(T)` is initial risk (SL distance * size).
+**Starting Balance**
+- Formula: `startingBalance` (input)
+- Notes: The initial equity deposited before any trading.
 
-## Max Drawdown
-`Max Drawdown = max over i of (peak_equity_up_to_i - E[i])`
+**Ending Balance**
+- Formula: `equityCurve[equityCurve.length - 1]`
+- Notes: Final equity after the last candle.
 
-## Max Drawdown %
-`Max Drawdown % = max over i of ((peak_equity_up_to_i - E[i]) / peak_equity_up_to_i) * 100`
+**Gross Profit**
+- Formula: `sum(netPnl for wins)`
+- Notes: Sum of positive net P&L only.
 
-## Recovery Factor
-`Recovery Factor = Net Profit / Max Drawdown` (absolute value)
+**Gross Loss**
+- Formula: `abs(sum(netPnl for losses))`
+- Notes: Absolute value of summed losing (and breakeven) trade P&L.
 
-## Sharpe Ratio
-`Sharpe = (mean(R) / std(R)) * sqrt(periods_per_year)`
-Using per-period simple returns; annualization factor depends on timeframe.
+**Net Profit**
+- Formula: `sum(netPnl for all trades)`
+- Notes: Equals `endingBalance - startingBalance` over the curve. Includes
+  commissions and slippage already deducted in trade P&L.
 
-## Sortino Ratio
-`Sortino = (mean(R) / downside_std(R)) * sqrt(periods_per_year)`
-where `downside_std` uses only negative returns (R < 0 or R < target).
+**Total Return %**
+- Formula: `(netProfit / startingBalance) * 100`
+- Notes: Returns 0 if `startingBalance <= 0`.
 
-## Best Day / Worst Day
-`Best Day = max daily return %; Worst Day = min daily return %`
-Aggregated from equity points grouped by calendar day (UTC).
+---
 
-## Monthly Return
-`Monthly Return % = (E[month_end] / E[month_start] - 1) * 100`
-Reported per calendar month.
+## Trade Statistics
+
+**Trade Count**
+- Formula: `trades.length`
+
+**Winning Trades**
+- Formula: `count(netPnl > 0)`
+
+**Losing Trades**
+- Formula: `count(netPnl <= 0)` (includes breakeven trades)
+
+**Win Rate %**
+- Formula: `(winningTrades / tradeCount) * 100`
+- Notes: 0 if `tradeCount == 0`.
+
+**Loss Rate %**
+- Formula: `(losingTrades / tradeCount) * 100`
+- Notes: 0 if `tradeCount == 0`. Equals `100 - winRate` only when no breakeven
+  trades exist.
+
+**Average Win**
+- Formula: `grossProfit / winningTrades`
+- Notes: 0 if no winning trades.
+
+**Average Loss**
+- Formula: `grossLoss / losingTrades`
+- Notes: 0 if no losing trades. Positive number (gross loss is absolute).
+
+**Largest Win**
+- Formula: `max(netPnl for wins)`
+- Notes: 0 if no winning trades.
+
+**Largest Loss**
+- Formula: `min(netPnl for losses)`
+- Notes: Most negative trade P&L. 0 if no losing trades.
+
+**Profit Factor**
+- Formula: `grossProfit / grossLoss`
+- Notes: If `grossLoss == 0`: returns `Infinity` when `grossProfit > 0`, else `0`.
+
+**Expectancy**
+- Formula: `netProfit / tradeCount`
+- Notes: Average net P&L per trade. 0 if `tradeCount == 0`.
+
+**Average R**
+- Formula: `sum(rMultiple for all trades) / tradeCount`
+- Notes: Mean of per-trade R-multiples. 0 if `tradeCount == 0`.
+
+---
+
+## R-Multiple Definition
+
+**rMultiple** (per trade, computed in `src/lib/calculations/pnl.ts`):
+- Formula: `rMultiple = netPnl / initialRisk`
+- where `initialRisk = |entry - stopLoss| * quantity * contractSize`
+
+Notes: `initialRisk` is the risk assumed at trade open (distance to stop times
+size). An R of 2.0 means the trade earned twice its initial risk.
+
+---
+
+## Drawdown & Risk-Adjusted Metrics
+
+**Max Drawdown**
+- Formula: `max(peak - equity)` over the equity curve
+- Notes: Largest absolute decline from a running peak. Computed by
+  `computeDrawdown` in `src/lib/calculations/drawdown.ts`.
+
+**Max Drawdown %**
+- Formula: `maxDrawdown / peak_at_that_point * 100`
+
+**Recovery Factor**
+- Formula: `netProfit / maxDrawdown`
+- Notes: If `maxDrawdown == 0`: returns `Infinity` when `netProfit > 0`, else `0`.
+
+**Sharpe**
+- Formula: `mean(periodReturns) / std(periodReturns) * sqrt(annualizationFactor)`
+- where `periodReturns[i] = (curve[i] - curve[i-1]) / curve[i-1]`
+- Notes: `std` is population standard deviation of period returns. If `std == 0`,
+  Sharpe is `0`. Annualization factor `252` is a simplification.
+
+**Sortino**
+- Formula: `mean(periodReturns) / downsideStd * sqrt(annualizationFactor)`
+- where `downsideStd = sqrt(sum(r<0 ? r^2 : 0 for r in periodReturns) / count(periodReturns))`
+- Notes: Uses downside deviation as the denominator (only negative returns
+  penalized). If `downsideStd == 0`, Sortino is `0`. Annualization factor `252`
+  is a simplification.
+
+---
+
+## Period-Based Metrics
+
+**Best Day**
+- Formula: `max(sum(netPnl) grouped by exit calendar day)`
+- Notes: Sums net P&L of all trades closed on each UTC day; reports the largest
+  daily total. 0 if no trades have an `exitTime`.
+
+**Worst Day**
+- Formula: `min(sum(netPnl) grouped by exit calendar day)`
+- Notes: Smallest (most negative) daily total. 0 if no closed trades.
+
+**Monthly Return**
+- Formula: `sum(sum(netPnl) grouped by exit calendar month)`
+- Notes: Aggregates daily closed-trade P&L into each `YYYY-MM` bucket and sums
+  across all months. 0 if no closed trades. Note: this is the total of monthly
+  sums (net of all months), not a compounded figure.
