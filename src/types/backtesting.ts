@@ -54,13 +54,19 @@ export interface RiskConfig {
   takeProfit?: number;
 }
 
+export type SpreadModel = "fixed" | "dynamic";
 export interface ExecutionConfig {
   spread: number;
+  spreadModel?: SpreadModel;
+  dynamicSpreadAtrMultiplier?: number;
   commissionModel: CommissionModel;
   commissionValue: number;
   slippage: number;
   executionModel: ExecutionModel;
   tpSlCollision: TpSlCollision;
+  swapLong?: number; // per lot per day, negative = cost
+  swapShort?: number;
+  fundingRate?: number; // for crypto, per 8h as decimal e.g. 0.0001
 }
 
 export type SessionFilter = "asia" | "london" | "new_york" | "overlap";
@@ -93,6 +99,8 @@ export interface BacktestConfig {
   symbolSpec: SymbolSpec;
 }
 
+export type OrderState = "pending" | "filled" | "partially_filled" | "cancelled" | "rejected" | "closed";
+
 export interface Trade {
   id: string;
   symbol: string;
@@ -102,11 +110,14 @@ export interface Trade {
   entryPrice: number;
   exitPrice: number | null;
   quantity: number;
+  filledQuantity?: number;
+  orderState?: OrderState;
   stopLoss: number | null;
   takeProfit: number | null;
   grossPnl: number;
   commission: number;
   slippage: number;
+  swap: number;
   netPnl: number;
   rMultiple: number;
   durationMs: number | null;

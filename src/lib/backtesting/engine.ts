@@ -11,6 +11,7 @@ import {
   commissionCost,
   grossPnl,
   rMultiple,
+  swapCost,
 } from "@/lib/calculations/pnl";
 import {
   fixedLotPositionSize,
@@ -20,12 +21,14 @@ import {
 import { computeMetrics, type MetricsResult } from "@/lib/calculations/metrics";
 import { calculateMargin, requiredMarginForOrder } from "@/lib/calculations/margin";
 import { grossPnl as calcUnrealized } from "@/lib/calculations/pnl";
+import { atr } from "@/lib/indicators/atr";
 import { ENGINE_VERSION, type Strategy, type StrategyContext } from "./strategy";
 
 interface Position {
   side: Side;
   entryPrice: number;
   quantity: number;
+  requestedQty?: number;
   stopLoss: number | null;
   takeProfit: number | null;
   trailingStop?: number | null;
@@ -90,12 +93,31 @@ function determineQuantity(
   }
 }
 
+function getDynamicSpread(candle: Candle, ex: BacktestConfig["execution"], allCandles: Candle[], idx: number): number {
+  if (ex.spreadModel === "dynamic") {
+    const mult = ex.dynamicSpreadAtrMultiplier ?? 0.1;
+    // Use ATR(14) as volatility proxy; fallback to fixed spread
+    if (idx >= 14) {
+      const slice = allCandles.slice(Math.max(0, idx - 14), idx + 1);
+      const vals = atr(slice, 14);
+      const v = vals[vals.length - 1];
+      if (v !== null && Number.isFinite(v)) return Math.max(ex.spread, v * mult);
+    }
+  }
+  return ex.spread;
+}
+
 function applyEntryAdjustment(
   side: Side,
   price: number,
   ex: BacktestConfig["execution"],
+  candle?: Candle,
+  allCandles?: Candle[],
+  idx?: number,
 ): number {
-  const adj = ex.spread + ex.slippage;
+  const spread = candle && allCandles && idx !== undefined ? getDynamicSpread(candle, ex, allCandles, idx) : ex.spread;
+  // BUY entry uses ask (price + spread), SELL entry uses bid (price - spread) per spec 16
+  const adj = spread + ex.slippage;
   return side === "buy" ? price + adj : price - adj;
 }
 
@@ -103,8 +125,13 @@ function applyExitAdjustment(
   side: Side,
   price: number,
   ex: BacktestConfig["execution"],
+  candle?: Candle,
+  allCandles?: Candle[],
+  idx?: number,
 ): number {
-  const adj = ex.spread + ex.slippage;
+  const spread = candle && allCandles && idx !== undefined ? getDynamicSpread(candle, ex, allCandles, idx) : ex.spread;
+  const adj = spread + ex.slippage;
+  // BUY exit uses bid (price - spread), SELL exit uses ask (price + spread)
   return side === "buy" ? price - adj : price + adj;
 }
 
@@ -135,7 +162,7 @@ export function runBacktest(
 
   function openPosition(side: Side, entryPrice: number, ex: PendingOrder) {
     if (state.position || state.pending) return;
-    const qty = determineQuantity(
+    let qty = determineQuantity(
       config,
       side,
       entryPrice,
@@ -147,6 +174,18 @@ export function runBacktest(
     if (qty <= 0) {
       warnings.push("Skipped order: non-positive position size.");
       return;
+    }
+    // Partial fill simulation: if volume is low relative to order size, fill only fraction
+    const currentCandle = candles[ctx.currentIndex];
+    if (currentCandle && currentCandle.volume > 0) {
+      const maxFillByVolume = currentCandle.volume / 100; // simplistic: 1 lot per 100 volume
+      if (qty > maxFillByVolume && maxFillByVolume > 0) {
+        const filled = Math.max(spec.minQuantity, Math.floor(maxFillByVolume / spec.quantityStep) * spec.quantityStep);
+        if (filled < qty) {
+          warnings.push(`Partial fill: requested ${qty} → filled ${filled} (volume ${currentCandle.volume}).`);
+          qty = filled;
+        }
+      }
     }
     // Leverage / margin check
     const lev = config.risk.leverage ?? 0;
@@ -176,6 +215,7 @@ export function runBacktest(
       side,
       entryPrice,
       quantity: qty,
+      requestedQty: ex.quantity ?? qty,
       stopLoss: ex.stopLoss ?? null,
       takeProfit: ex.takeProfit ?? null,
       trailingStop: ex.trailingStop ?? null,
@@ -199,9 +239,16 @@ export function runBacktest(
     const entrySlip = config.execution.slippage * pos.quantity * cs;
     const exitSlip = config.execution.slippage * pos.quantity * cs;
     const gpnl = grossPnl(pos.side, pos.entryPrice, exitPrice, pos.quantity, cs);
-    const net = gpnl - commission - entrySlip - exitSlip;
+    // Swap/funding: accrue per day held
+    const msPerDay = 86400000;
+    const daysHeld = Math.max(0, (exitTime - pos.entryTime) / msPerDay);
+    const swap = swapCost(pos.side, pos.quantity, daysHeld, config.execution.swapLong ?? 0, config.execution.swapShort ?? 0, config.execution.fundingRate ?? 0, pos.entryPrice);
+    // Partial fill modeling: if pending quantity was partially filled, adjust gross proportionally (already in qty)
+    const net = gpnl - commission - entrySlip - exitSlip + swap;
     balance += net;
     const durationMs = exitTime - pos.entryTime;
+    // Determine order state: if qty < requested, mark partially_filled else filled -> closed
+    const orderState = pos.quantity < (pos as unknown as { requestedQty?: number }).requestedQty! ? "partially_filled" : "closed";
     trades.push({
       id: `T${tradeIndex++}`,
       symbol: config.symbol,
@@ -211,12 +258,15 @@ export function runBacktest(
       entryPrice: round(pos.entryPrice, spec.pricePrecision),
       exitPrice: round(exitPrice, spec.pricePrecision),
       quantity: round(pos.quantity, spec.quantityPrecision),
+      filledQuantity: round(pos.quantity, spec.quantityPrecision),
+      orderState: orderState as unknown as import("@/types/backtesting").OrderState,
       stopLoss: pos.stopLoss === null ? null : round(pos.stopLoss, spec.pricePrecision),
       takeProfit:
         pos.takeProfit === null ? null : round(pos.takeProfit, spec.pricePrecision),
       grossPnl: round(gpnl, 8),
       commission: round(commission, 8),
       slippage: round(entrySlip + exitSlip, 8),
+      swap: round(swap, 8),
       netPnl: round(net, 8),
       rMultiple: round(rMultiple(net, pos.riskAmount), 6),
       durationMs,

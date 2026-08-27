@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { BacktestConfig, Candle, SymbolSpec } from "@/types/backtesting";
 import { runBacktest, type RunResult } from "@/lib/backtesting/engine";
 import { runBacktestInWorker, canUseWorker } from "@/lib/backtesting/worker-client";
-import { DEMO_STRATEGIES, getStrategy } from "@/lib/backtesting";
+import { DEMO_STRATEGIES, getStrategy, getAllStrategies } from "@/lib/backtesting";
 import { CandlestickChart } from "@/components/charts/candlestick-chart";
 import { MetricsPanel } from "@/components/backtest/metrics-panel";
 import { EquityChart, DrawdownChart } from "@/components/backtest/equity-chart";
@@ -71,7 +71,8 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
 
 export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
   const [datasetId, setDatasetId] = useState(datasets[0]?.id ?? "");
-  const [strategyId, setStrategyId] = useState(DEMO_STRATEGIES[0].id);
+  const allStrats = useMemo(() => getAllStrategies(), []);
+  const [strategyId, setStrategyId] = useState(allStrats[0]?.id ?? DEMO_STRATEGIES[0].id);
   const [capital, setCapital] = useState("10000");
   const [riskMode, setRiskMode] = useState<"fixed_lot" | "percent_risk">("fixed_lot");
   const [fixedLot, setFixedLot] = useState("1");
@@ -294,7 +295,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
                     <label className="block">
                       <span className={labelCls}>Strategy</span>
                       <select value={strategyId} onChange={(e) => setStrategyId(e.target.value)} className={`${inputCls} mt-1`}>
-                        {DEMO_STRATEGIES.map((s) => (
+                        {allStrats.map((s) => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
@@ -524,6 +525,16 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
                       className="rounded-md border border-white/10 px-2 py-1.5 text-xs text-white/60 hover:bg-white/[0.06]"
                     >
                       CSV
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!lastConfig || !result) return;
+                        const { exportBacktestPdf } = await import("@/lib/export/pdf");
+                        exportBacktestPdf({ symbol: lastConfig.symbol, timeframe: lastConfig.timeframe, config: lastConfig, metrics: result.metrics, trades: result.trades });
+                      }}
+                      className="col-span-2 rounded-md border border-white/10 px-2 py-1.5 text-xs text-white/60 hover:bg-white/[0.06]"
+                    >
+                      PDF Report
                     </button>
                   </div>
                   <p className="text-[10px] leading-relaxed text-white/25">Backtesting historis tidak menjamin performa masa depan.</p>

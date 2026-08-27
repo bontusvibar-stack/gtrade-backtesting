@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { runMonteCarlo } from "@/lib/calculations/monte-carlo";
+import { EquityPathsChart } from "@/components/monte-carlo/equity-paths-chart";
 
 interface RunRow {
   id: string;
@@ -60,6 +61,10 @@ export default async function MonteCarloPage() {
             <h2 className="text-sm font-semibold">Drawdown Risk</h2>
             <p className="mt-1 text-xs text-muted-foreground">Probability of drawdown &gt; 20%: {(mc.probDrawdownOver20 * 100).toFixed(1)}%</p>
             <p className="mt-2 text-[10px] text-muted-foreground">Simulation uses only saved trade ledger net PnL. No future data. No fabricated market data.</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-3">
+            <h2 className="text-sm font-semibold">Equity Paths (20 samples)</h2>
+            <div className="mt-2"><EquityPathsChart runs={mc.runs} /></div>
           </div>
         </>
       )}

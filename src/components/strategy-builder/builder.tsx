@@ -14,10 +14,11 @@ const defaultCond = (): Condition => ({
   right: { type: "indicator", ref: "SMA_20", param: 20 },
 });
 
-export function StrategyBuilder({ candles }: { candles?: Candle[] }) {
+export function StrategyBuilder({ candles, onUseStrategy }: { candles?: Candle[]; onUseStrategy?: (rule: ConditionGroup) => void }) {
   const [group, setGroup] = useState<ConditionGroup>({ id: "root", logic: "AND", conditions: [defaultCond()] });
   const [logic, setLogic] = useState<LogicOp>("AND");
   const [preview, setPreview] = useState<string>("");
+  const [saved, setSaved] = useState<string | null>(null);
 
   function addCondition() {
     setGroup((g) => ({ ...g, conditions: [...g.conditions, defaultCond()], logic }));
@@ -41,6 +42,26 @@ export function StrategyBuilder({ candles }: { candles?: Candle[] }) {
       if (entry) hits++;
     }
     setPreview(`Signals: ${hits} / ${candles.length} candles (${((hits / candles.length) * 100).toFixed(1)}%)`);
+  }
+
+  async function saveAndUse() {
+    const name = prompt("Name for custom strategy:", `Custom ${new Date().toISOString().slice(0, 10)}`);
+    if (!name) return;
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { data: strat, error } = await supabase.from("strategies").insert({ user_id: user.id, name, description: `Builder: ${group.conditions.length} conditions (${logic})`, category: "custom" }).select("id").single<{ id: string }>();
+      if (error) throw new Error(error.message);
+      await supabase.from("strategy_versions").insert({ strategy_id: strat.id, user_id: user.id, version: 1, parameters: { builder: group }, code: JSON.stringify(group) });
+      setSaved(`Saved ${name} — now selectable via Strategy dropdown (refresh Backtest).`);
+      if (onUseStrategy) onUseStrategy(group);
+      // Store locally for immediate use in Backtest via localStorage
+      localStorage.setItem("gtrade_custom_builder", JSON.stringify({ name, group }));
+    } catch (e) {
+      setSaved(e instanceof Error ? e.message : "Save failed");
+    }
   }
 
   return (
@@ -92,9 +113,11 @@ export function StrategyBuilder({ candles }: { candles?: Candle[] }) {
       <div className="flex gap-2">
         <button onClick={addCondition} className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-white/70">+ Add condition</button>
         <button onClick={runPreview} className="rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-black">Preview signals</button>
+        <button onClick={saveAndUse} className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white">Save & Use Live</button>
         <button onClick={() => navigator.clipboard.writeText(JSON.stringify(group, null, 2))} className="rounded-md border border-white/10 px-3 py-1.5 text-xs text-white/50">Copy JSON</button>
       </div>
       {preview && <p className="text-xs text-emerald-300">{preview}</p>}
+      {saved && <p className="text-xs text-amber-300">{saved}</p>}
       <details className="text-xs text-white/30"><summary>JSON</summary><pre className="mt-1 overflow-auto rounded bg-black/30 p-2 text-[11px]">{JSON.stringify(group, null, 2)}</pre></details>
     </div>
   );
