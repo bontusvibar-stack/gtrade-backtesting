@@ -2,8 +2,9 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { MonthlyHeatmap } from "@/components/analytics/monthly-heatmap";
+import { DailyCalendar } from "@/components/analytics/daily-calendar";
 import { EquityChart, DrawdownChart } from "@/components/backtest/equity-chart";
-import type { EquityPoint, Trade } from "@/types/backtesting";
+import type { EquityPoint } from "@/types/backtesting";
 
 interface TradeRow {
   exit_time: string | null;
@@ -60,19 +61,25 @@ export default async function AnalyticsPage() {
   }));
 
   const byMonth = new Map<string, number>();
+  const byDay = new Map<string, number>();
   for (const t of trades) {
     if (!t.exit_time) continue;
     const key = t.exit_time.slice(0, 7);
     byMonth.set(key, (byMonth.get(key) ?? 0) + Number(t.net_pnl));
+    const day = t.exit_time.slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + Number(t.net_pnl));
   }
   const months = Array.from(byMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, pnl]) => ({ key, pnl }));
+  const daily = Array.from(byDay.entries()).map(([date, pnl]) => ({ date, pnl }));
 
   const grossWin = trades
     .filter((t) => t.net_pnl > 0)
     .reduce((s, t) => s + t.net_pnl, 0);
   const sumPnl = trades.reduce((s, t) => s + t.net_pnl, 0);
+  const bestTrade = trades.length ? Math.max(...trades.map((t) => Number(t.net_pnl))) : 0;
+  const worstTrade = trades.length ? Math.min(...trades.map((t) => Number(t.net_pnl))) : 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-8">
@@ -138,6 +145,17 @@ export default async function AnalyticsPage() {
           <div className="rounded-lg border border-border bg-card p-3">
             <h3 className="mb-2 text-sm font-semibold">Monthly Performance</h3>
             <MonthlyHeatmap months={months} />
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-3">
+            <h3 className="mb-2 text-sm font-semibold">Daily Calendar (last 90 days)</h3>
+            <DailyCalendar days={daily} />
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Best trade</p><p className="font-mono text-sm text-chart-1">{bestTrade.toFixed(2)}</p></div>
+            <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Worst trade</p><p className="font-mono text-sm text-loss">{worstTrade.toFixed(2)}</p></div>
+            <div className="rounded-lg border border-border bg-card p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Avg per trade</p><p className="font-mono text-sm">{trades.length ? (sumPnl / trades.length).toFixed(2) : "—"}</p></div>
           </div>
         </>
       )}

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StrategyManager, type StrategyRow } from "@/components/strategies/strategy-manager";
+import { StrategyBuilder } from "@/components/strategy-builder/builder";
 
 export default async function StrategiesPage() {
   const supabase = await createClient();
@@ -23,7 +24,8 @@ export default async function StrategiesPage() {
         Create, duplicate, version and archive strategies. Backtests record the strategy
         version used for reproducibility.
       </p>
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
+        <StrategyBuilder />
         <StrategyManager initial={data ?? []} />
       </div>
     </div>

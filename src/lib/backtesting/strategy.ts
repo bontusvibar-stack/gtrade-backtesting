@@ -8,8 +8,12 @@ import type {
 
 export interface OpenParams {
   side: Side;
+  type?: "market" | "limit" | "stop" | "stop_limit";
+  limitPrice?: number;
+  stopPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
+  trailingStop?: number;
   quantity?: number;
   label?: string;
 }
@@ -36,4 +40,4 @@ export interface Strategy {
   finalize?(ctx: StrategyContext): void;
 }
 
-export const ENGINE_VERSION = "0.1.0";
+export const ENGINE_VERSION = "0.2.0";

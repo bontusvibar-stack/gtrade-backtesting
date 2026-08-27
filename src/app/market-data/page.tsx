@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CsvUpload } from "@/components/market-data/csv-upload";
 import { DemoGenerator } from "@/components/market-data/demo-generator";
-import type { MarketDataMeta } from "@/lib/market-data/provider";
+import { DatasetTable } from "@/components/market-data/dataset-table";
 
 interface DatasetRow {
   id: string;
@@ -50,49 +50,7 @@ export default async function MarketDataPage() {
         <h2 className="border-b border-border px-4 py-3 text-sm font-semibold">
           Your datasets
         </h2>
-        {!datasets || datasets.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground">
-            No datasets yet. Import a CSV or generate demo data above.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Symbol</th>
-                  <th className="px-4 py-2 font-medium">Type</th>
-                  <th className="px-4 py-2 font-medium">TF</th>
-                  <th className="px-4 py-2 font-medium">Candles</th>
-                  <th className="px-4 py-2 font-medium">Range</th>
-                </tr>
-              </thead>
-              <tbody>
-                {datasets.map((d) => (
-                  <tr key={d.id} className="border-b border-border/50 last:border-0">
-                    <td className="px-4 py-2 font-medium">
-                      {d.is_demo && (
-                        <span className="mr-2 rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
-                          DEMO
-                        </span>
-                      )}
-                      {d.symbol}
-                    </td>
-                    <td className="px-4 py-2 text-muted-foreground">
-                      {d.market_type ?? "—"}
-                    </td>
-                    <td className="px-4 py-2 text-muted-foreground">{d.timeframe}</td>
-                    <td className="px-4 py-2 tabular-nums">{d.candle_count}</td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground">
-                      {d.start_time ? new Date(d.start_time).toISOString().slice(0, 10) : "—"}
-                      {" → "}
-                      {d.end_time ? new Date(d.end_time).toISOString().slice(0, 10) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DatasetTable datasets={datasets ?? []} />
       </div>
     </div>
   );

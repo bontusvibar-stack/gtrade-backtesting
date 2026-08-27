@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { BacktestConfig, Candle, SymbolSpec } from "@/types/backtesting";
 import { runBacktest, type RunResult } from "@/lib/backtesting/engine";
+import { runBacktestInWorker, canUseWorker } from "@/lib/backtesting/worker-client";
 import { DEMO_STRATEGIES, getStrategy } from "@/lib/backtesting";
 import { CandlestickChart } from "@/components/charts/candlestick-chart";
 import { MetricsPanel } from "@/components/backtest/metrics-panel";
@@ -92,6 +93,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
   const [lastMarketDataSetId, setLastMarketDataSetId] = useState<string | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
       return;
     }
     setRunning(true);
+    setProgress(null);
     try {
       const supabase = createClient();
       const { data, error: fetchErr } = await supabase
@@ -153,7 +156,11 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
         symbolSpec: { ...DEFAULT_SPEC, symbol: data.symbol },
       };
 
-      const run = runBacktest(config, dsCandles, s);
+      // Use Web Worker for large datasets to avoid UI freeze
+      const useWorker = canUseWorker() && dsCandles.length >= 5000;
+      if (useWorker) setProgress(`Processing ${dsCandles.length.toLocaleString()} candles in worker...`);
+      else setProgress(`Processing ${dsCandles.length.toLocaleString()} candles...`);
+      const run = useWorker ? await runBacktestInWorker(config, dsCandles) : runBacktest(config, dsCandles, s);
       setCandles(dsCandles);
       setResult(run);
       setLastConfig(config);
@@ -163,6 +170,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
       setError(e instanceof Error ? e.message : "Backtest gagal.");
     } finally {
       setRunning(false);
+      setProgress(null);
     }
   }
 
@@ -196,6 +204,7 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
               {result.trades.length} trades · Engine v{result.engineVersion}
             </span>
           )}
+          {progress && <span className="hidden text-xs text-white/40 md:inline">{progress}</span>}
           <button
             onClick={onRun}
             disabled={running}

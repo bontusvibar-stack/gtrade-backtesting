@@ -1,5 +1,5 @@
 export type Side = "buy" | "sell";
-export type OrderType = "market" | "limit" | "stop";
+export type OrderType = "market" | "limit" | "stop" | "stop_limit";
 export type ExitReason =
   | "tp"
   | "sl"
@@ -8,7 +8,8 @@ export type ExitReason =
   | "manual"
   | "end_of_data"
   | "max_trades"
-  | "max_daily_loss";
+  | "max_daily_loss"
+  | "margin_call";
 
 export type RiskMode = "fixed_lot" | "percent_risk" | "fixed_money";
 export type CommissionModel = "percent" | "per_unit" | "flat";
@@ -46,6 +47,8 @@ export interface RiskConfig {
   maxDailyLoss?: number;
   maxTrades?: number;
   maxPositions?: number;
+  maxPositionSize?: number;
+  maxConsecutiveLosses?: number;
   leverage?: number;
   stopLoss?: number;
   takeProfit?: number;

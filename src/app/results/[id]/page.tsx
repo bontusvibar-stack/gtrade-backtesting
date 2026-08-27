@@ -127,6 +127,22 @@ export default async function ResultDetailPage({ params }: PageProps) {
       </div>
 
       <details className="rounded-lg border border-border bg-card p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Configuration (single source of truth)</summary>
+        <pre className="mt-2 overflow-auto rounded bg-black/40 p-3 text-xs">{JSON.stringify(cfg, null, 2)}</pre>
+      </details>
+
+      <details className="rounded-lg border border-border bg-card p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Logs / Warnings</summary>
+        <div className="mt-2 text-xs">
+          {((run.backtest_results?.[0] as Record<string, unknown>)?.warnings as string[] | undefined)?.length ? (
+            ((run.backtest_results?.[0] as Record<string, unknown>).warnings as string[]).map((w, i) => <p key={i} className="text-amber-300">• {w}</p>)
+          ) : (
+            <p className="text-muted-foreground">No warnings. Historical backtesting does not guarantee future performance.</p>
+          )}
+        </div>
+      </details>
+
+      <details className="rounded-lg border border-border bg-card p-3">
         <summary className="cursor-pointer text-sm font-semibold">Equity points</summary>
         <div className="mt-2 max-h-64 overflow-auto text-xs font-mono">
           {(equity ?? [])
@@ -143,6 +159,11 @@ export default async function ResultDetailPage({ params }: PageProps) {
           )}
         </div>
       </details>
+
+      <div className="flex gap-2">
+        <a href={`/api/export/${id}`} className="rounded-md border border-border px-3 py-1.5 text-xs">Export JSON</a>
+        <span className="text-xs text-muted-foreground">Use workspace JSON/CSV export for full trade ledger.</span>
+      </div>
     </div>
   );
 }

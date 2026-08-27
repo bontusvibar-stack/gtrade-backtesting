@@ -23,6 +23,13 @@ export function CsvUpload() {
       setErrors(result.errors.slice(0, 10));
       return;
     }
+    if (result.warnings.length > 0) {
+      const proceed = confirm(`Warnings:\n${result.warnings.slice(0, 5).join("\n")}\nProceed anyway?`);
+      if (!proceed) {
+        setErrors(result.warnings.slice(0, 10));
+        return;
+      }
+    }
 
     const symbol = window.prompt("Symbol for this dataset (e.g. EURUSD):");
     if (!symbol) return;

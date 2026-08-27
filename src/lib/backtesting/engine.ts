@@ -18,6 +18,8 @@ import {
   percentRiskPositionSize,
 } from "@/lib/calculations/position-sizing";
 import { computeMetrics, type MetricsResult } from "@/lib/calculations/metrics";
+import { calculateMargin, requiredMarginForOrder } from "@/lib/calculations/margin";
+import { grossPnl as calcUnrealized } from "@/lib/calculations/pnl";
 import { ENGINE_VERSION, type Strategy, type StrategyContext } from "./strategy";
 
 interface Position {
@@ -26,6 +28,8 @@ interface Position {
   quantity: number;
   stopLoss: number | null;
   takeProfit: number | null;
+  trailingStop?: number | null;
+  trailingOffset?: number | null; // distance from peak/trough
   entryTime: number;
   entryIndex: number;
   riskAmount: number;
@@ -34,8 +38,12 @@ interface Position {
 
 interface PendingOrder {
   side: Side;
+  type?: "market" | "limit" | "stop" | "stop_limit";
+  limitPrice?: number;
+  stopPrice?: number;
   stopLoss?: number;
   takeProfit?: number;
+  trailingStop?: number | null;
   quantity?: number;
   label?: string;
 }
@@ -140,6 +148,29 @@ export function runBacktest(
       warnings.push("Skipped order: non-positive position size.");
       return;
     }
+    // Leverage / margin check
+    const lev = config.risk.leverage ?? 0;
+    if (lev > 0) {
+      const req = requiredMarginForOrder(qty, entryPrice, cs, lev);
+      const existing = state.position as Position | null;
+      const unrealized = existing
+        ? calcUnrealized(existing.side, existing.entryPrice, entryPrice, existing.quantity, cs)
+        : 0;
+      const { freeMargin } = calculateMargin(balance, unrealized, existing?.quantity ?? 0, existing?.entryPrice ?? entryPrice, cs, lev);
+      // freeMargin already accounts for existing position; for new position we need freeMargin >= req
+      // Simplified: if no existing position, equity = freeMargin
+      const available = state.position ? freeMargin : equity;
+      if (available < req) {
+        warnings.push(`Order rejected: insufficient margin (need ${req.toFixed(2)}, free ${available.toFixed(2)}, leverage ${lev}x).`);
+        return;
+      }
+      // Also check maxPositionSize if configured
+      const maxPos = (config.risk as unknown as { maxPositionSize?: number }).maxPositionSize;
+      if (maxPos !== undefined && qty > maxPos) {
+        warnings.push(`Order rejected: position size ${qty} exceeds max ${maxPos}.`);
+        return;
+      }
+    }
     const riskPerUnit = Math.abs(entryPrice - (ex.stopLoss ?? entryPrice)) * cs;
     state.position = {
       side,
@@ -147,6 +178,8 @@ export function runBacktest(
       quantity: qty,
       stopLoss: ex.stopLoss ?? null,
       takeProfit: ex.takeProfit ?? null,
+      trailingStop: ex.trailingStop ?? null,
+      trailingOffset: ex.trailingStop ?? null,
       entryTime: 0,
       entryIndex: 0,
       riskAmount: riskPerUnit * qty,
@@ -191,6 +224,12 @@ export function runBacktest(
     });
     const day = new Date(exitTime).toISOString().slice(0, 10);
     dailyPnl.set(day, (dailyPnl.get(day) ?? 0) + net);
+    if (net < 0) consecLosses++;
+    else if (net > 0) consecLosses = 0;
+    if (consecLosses >= maxConsecLosses) {
+      allowNewEntries = false;
+      warnings.push(`Max consecutive losses (${maxConsecLosses}) reached — blocking new trades.`);
+    }
     state.position = null;
   }
 
@@ -205,8 +244,12 @@ export function runBacktest(
       if (!allowNewEntries) return;
       state.pending = {
         side: params.side,
+        type: params.type ?? "market",
+        limitPrice: params.limitPrice,
+        stopPrice: params.stopPrice,
         stopLoss: params.stopLoss,
         takeProfit: params.takeProfit,
+        trailingStop: params.trailingStop ?? null,
         quantity: params.quantity,
         label: params.label,
       };
@@ -223,6 +266,8 @@ export function runBacktest(
 
   const maxTrades = config.risk.maxTrades ?? Infinity;
   const maxDailyLoss = config.risk.maxDailyLoss ?? Infinity;
+  const maxConsecLosses = (config.risk as unknown as { maxConsecutiveLosses?: number }).maxConsecutiveLosses ?? Infinity;
+  let consecLosses = 0;
 
   strategy.initialize?.(ctx);
 
@@ -232,75 +277,155 @@ export function runBacktest(
     const day = new Date(candle.timestamp).toISOString().slice(0, 10);
     if ((dailyPnl.get(day) ?? 0) <= -maxDailyLoss) maxDailyLossHit = true;
 
-    // 1. Fill pending order from previous candle (next_open model)
+    // 1. Fill pending order from previous candle (next_open model) or check limit/stop triggers
     const openPend = state.pending;
     if (openPend) {
-      state.pending = null;
-      const fillPrice = applyEntryAdjustment(
-        openPend.side,
-        candle.open,
-        config.execution,
-      );
-      openPosition(openPend.side, fillPrice, openPend);
-      const np = state.position;
-      if (np) {
-        np.entryTime = candle.timestamp;
-        np.entryIndex = i;
+      let shouldFill = false;
+      let fillPriceRaw: number | null = null;
+      const typ = openPend.type ?? "market";
+      if (typ === "market") {
+        // Market fills at next open (or remains pending until next candle)
+        if (config.execution.executionModel !== "close") {
+          shouldFill = true;
+          fillPriceRaw = candle.open;
+        }
+      } else if (typ === "limit") {
+        const lp = openPend.limitPrice;
+        if (lp !== undefined) {
+          if (openPend.side === "buy" && candle.low <= lp) {
+            shouldFill = true;
+            fillPriceRaw = Math.min(candle.open, lp);
+            // Conservative: fill at limit price if touched
+            fillPriceRaw = lp;
+          } else if (openPend.side === "sell" && candle.high >= lp) {
+            shouldFill = true;
+            fillPriceRaw = lp;
+          }
+        }
+      } else if (typ === "stop") {
+        const sp = openPend.stopPrice;
+        if (sp !== undefined) {
+          if (openPend.side === "buy" && candle.high >= sp) {
+            shouldFill = true;
+            fillPriceRaw = Math.max(candle.open, sp);
+            fillPriceRaw = sp;
+          } else if (openPend.side === "sell" && candle.low <= sp) {
+            shouldFill = true;
+            fillPriceRaw = sp;
+          }
+        }
+      } else if (typ === "stop_limit") {
+        const sp = openPend.stopPrice;
+        const lp = openPend.limitPrice;
+        if (sp !== undefined && lp !== undefined) {
+          const stopHit =
+            (openPend.side === "buy" && candle.high >= sp) ||
+            (openPend.side === "sell" && candle.low <= sp);
+          if (stopHit) {
+            const limitHit =
+              (openPend.side === "buy" && candle.low <= lp) ||
+              (openPend.side === "sell" && candle.high >= lp);
+            if (limitHit) {
+              shouldFill = true;
+              fillPriceRaw = lp;
+            }
+          }
+        }
       }
+      if (shouldFill && fillPriceRaw !== null) {
+        state.pending = null;
+        const fillPrice = applyEntryAdjustment(openPend.side, fillPriceRaw, config.execution);
+        openPosition(openPend.side, fillPrice, openPend);
+        const np = state.position;
+        if (np) {
+          np.entryTime = candle.timestamp;
+          np.entryIndex = i;
+        }
+      }
+      // market with close model keeps pending for bottom handler; limit/stop keeps pending until hit
     }
 
-    // 2. Check exits on current candle using high/low (no look-ahead)
+    // 2. Check exits on current candle using high/low (no look-ahead) + trailing stop
     const pos = state.position as Position | null;
     if (pos) {
+      // Update trailing stop if configured
+      if (pos.trailingOffset !== null && pos.trailingOffset !== undefined && pos.trailingOffset > 0) {
+        if (pos.side === "buy") {
+          const newStop = candle.high - pos.trailingOffset;
+          if (pos.stopLoss === null || newStop > pos.stopLoss) {
+            pos.stopLoss = newStop;
+          }
+        } else {
+          const newStop = candle.low + pos.trailingOffset;
+          if (pos.stopLoss === null || newStop < pos.stopLoss) {
+            pos.stopLoss = newStop;
+          }
+        }
+      }
+      // Check SL/TP and trailing
+      const isTrailingHit =
+        pos.trailingOffset !== null &&
+        pos.trailingOffset !== undefined &&
+        pos.trailingOffset > 0 &&
+        pos.stopLoss !== null &&
+        ((pos.side === "buy" && candle.low <= pos.stopLoss) ||
+          (pos.side === "sell" && candle.high >= pos.stopLoss));
+      let exitReason: ExitReason | null = null;
+      let exitPxRaw: number | null = null;
       if (pos.side === "buy") {
         const slHit = pos.stopLoss !== null && candle.low <= pos.stopLoss;
         const tpHit = pos.takeProfit !== null && candle.high >= pos.takeProfit;
         if (slHit || tpHit) {
-          let reason: ExitReason;
-          let exitPx: number;
           if (slHit && tpHit) {
             const rule = config.execution.tpSlCollision;
-            const favorStop =
-              rule === "stop_first" || rule === "both_touched_favor_broker";
-            reason = favorStop ? "sl" : "tp";
-            exitPx = applyExitAdjustment(
-              pos.side,
-              favorStop ? (pos.stopLoss as number) : (pos.takeProfit as number),
-              config.execution,
-            );
+            const favorStop = rule === "stop_first" || rule === "both_touched_favor_broker";
+            exitReason = favorStop ? "sl" : "tp";
+            exitPxRaw = favorStop ? (pos.stopLoss as number) : (pos.takeProfit as number);
           } else if (slHit) {
-            reason = "sl";
-            exitPx = applyExitAdjustment(pos.side, pos.stopLoss as number, config.execution);
+            exitReason = isTrailingHit && slHit ? "trailing_stop" : "sl";
+            exitPxRaw = pos.stopLoss as number;
           } else {
-            reason = "tp";
-            exitPx = applyExitAdjustment(pos.side, pos.takeProfit as number, config.execution);
+            exitReason = "tp";
+            exitPxRaw = pos.takeProfit as number;
           }
-          closePosition(exitPx, reason, candle.timestamp);
+        } else if (isTrailingHit) {
+          exitReason = "trailing_stop";
+          exitPxRaw = pos.stopLoss as number;
         }
       } else {
         const slHit = pos.stopLoss !== null && candle.high >= pos.stopLoss;
         const tpHit = pos.takeProfit !== null && candle.low <= pos.takeProfit;
         if (slHit || tpHit) {
-          let reason: ExitReason;
-          let exitPx: number;
           if (slHit && tpHit) {
             const rule = config.execution.tpSlCollision;
-            const favorStop =
-              rule === "stop_first" || rule === "both_touched_favor_broker";
-            reason = favorStop ? "sl" : "tp";
-            exitPx = applyExitAdjustment(
-              pos.side,
-              favorStop ? (pos.stopLoss as number) : (pos.takeProfit as number),
-              config.execution,
-            );
+            const favorStop = rule === "stop_first" || rule === "both_touched_favor_broker";
+            exitReason = favorStop ? "sl" : "tp";
+            exitPxRaw = favorStop ? (pos.stopLoss as number) : (pos.takeProfit as number);
           } else if (slHit) {
-            reason = "sl";
-            exitPx = applyExitAdjustment(pos.side, pos.stopLoss as number, config.execution);
+            exitReason = isTrailingHit && slHit ? "trailing_stop" : "sl";
+            exitPxRaw = pos.stopLoss as number;
           } else {
-            reason = "tp";
-            exitPx = applyExitAdjustment(pos.side, pos.takeProfit as number, config.execution);
+            exitReason = "tp";
+            exitPxRaw = pos.takeProfit as number;
           }
-          closePosition(exitPx, reason, candle.timestamp);
+        } else if (isTrailingHit) {
+          exitReason = "trailing_stop";
+          exitPxRaw = pos.stopLoss as number;
+        }
+      }
+      if (exitReason && exitPxRaw !== null) {
+        const px = applyExitAdjustment(pos.side, exitPxRaw, config.execution);
+        closePosition(px, exitReason, candle.timestamp);
+      }
+      // Margin call check: if free margin negative, liquidate
+      const lev = config.risk.leverage ?? 0;
+      if (lev > 0 && state.position) {
+        const unreal = grossPnl(pos.side, pos.entryPrice, candle.close, pos.quantity, cs);
+        const { freeMargin } = calculateMargin(balance, unreal, pos.quantity, pos.entryPrice, cs, lev);
+        if (freeMargin < 0) {
+          const px = applyExitAdjustment(pos.side, candle.close, config.execution);
+          closePosition(px, "margin_call" as ExitReason, candle.timestamp);
+          warnings.push("Margin call: position liquidated.");
         }
       }
     }

@@ -23,7 +23,23 @@ function toTimestamp(raw: string): number | null {
   return Number.isNaN(t) ? null : t;
 }
 
-export function validateCandles(candles: Candle[]): string[] {
+export function detectMissingCandles(candles: Candle[], timeframeMs: number): string[] {
+  const warnings: string[] = [];
+  if (candles.length < 2 || !timeframeMs) return warnings;
+  for (let i = 1; i < candles.length; i++) {
+    const diff = candles[i].timestamp - candles[i - 1].timestamp;
+    if (diff > timeframeMs * 1.5) {
+      const missing = Math.round(diff / timeframeMs) - 1;
+      warnings.push(`Gap at row ${i + 1}: ${missing} missing candle(s) between ${new Date(candles[i - 1].timestamp).toISOString()} and ${new Date(candles[i].timestamp).toISOString()} (expected ${timeframeMs}ms, got ${diff}ms).`);
+    }
+    if (diff % timeframeMs !== 0 && diff !== timeframeMs) {
+      // inconsistent timeframe
+    }
+  }
+  return warnings;
+}
+
+export function validateCandles(candles: Candle[], timeframeMs?: number): string[] {
   const errors: string[] = [];
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
@@ -31,15 +47,28 @@ export function validateCandles(candles: Candle[]): string[] {
       errors.push(`Row ${i + 1}: non-numeric OHLC value.`);
       continue;
     }
+    if (Number.isNaN(c.timestamp) || !Number.isFinite(c.timestamp)) errors.push(`Row ${i + 1}: invalid timestamp.`);
     if (c.high < c.low) errors.push(`Row ${i + 1}: high (${c.high}) < low (${c.low}).`);
     if (c.close > c.high || c.close < c.low)
       errors.push(`Row ${i + 1}: close (${c.close}) outside high/low range.`);
     if (c.open > c.high || c.open < c.low)
       errors.push(`Row ${i + 1}: open (${c.open}) outside high/low range.`);
+    if (c.high < c.open || c.high < c.close) errors.push(`Row ${i + 1}: high must be >= open and close.`);
+    if (c.low > c.open || c.low > c.close) errors.push(`Row ${i + 1}: low must be <= open and close.`);
     if (c.open <= 0 || c.close <= 0) errors.push(`Row ${i + 1}: non-positive price.`);
     if (c.volume < 0) errors.push(`Row ${i + 1}: negative volume.`);
+    if (c.volume !== undefined && Number.isNaN(c.volume)) errors.push(`Row ${i + 1}: invalid volume.`);
     if (i > 0 && c.timestamp <= candles[i - 1].timestamp)
       errors.push(`Row ${i + 1}: timestamp not strictly increasing.`);
+  }
+  if (timeframeMs && candles.length > 2) {
+    // Check timeframe consistency: median diff should match timeframe
+    const diffs = candles.slice(1).map((c, i) => c.timestamp - candles[i].timestamp);
+    const sorted = [...diffs].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (median !== timeframeMs) {
+      errors.push(`Timeframe inconsistency: median interval ${median}ms does not match expected ${timeframeMs}ms.`);
+    }
   }
   return errors;
 }
@@ -115,6 +144,17 @@ export function parseCsv(csv: string): ParseResult {
       errors.push(`Row ${i + 1}: duplicate timestamp.`);
     }
     seen.add(candles[i].timestamp);
+  }
+
+  // Timezone normalization: store all timestamps as UTC ms, validate no timezone drift
+  // Detect missing candles if we can infer timeframe from median diff
+  if (candles.length > 2 && errors.length === 0) {
+    const diffs = candles.slice(1).map((c, i) => c.timestamp - candles[i].timestamp);
+    const sorted = [...diffs].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const gaps = detectMissingCandles(candles, median);
+    warnings.push(...gaps);
+    if (gaps.length > 0) warnings.push("Missing candles detected — backtest will have gaps; consider filling or rejecting dataset.");
   }
 
   if (candles.length === 0 && errors.length === 0) {
