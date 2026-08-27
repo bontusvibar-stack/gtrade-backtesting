@@ -50,6 +50,9 @@
   "allowScripts": {
     "unrs-resolver": true,
     "shadcn": true,
-    "esbuild": true
+    "esbuild": true,
+    "core-js": true,
+    "jspdf": true,
+    "canvg": true
   }
 }
