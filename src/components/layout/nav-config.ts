@@ -16,5 +16,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/compare", label: "Compare" },
   { href: "/optimize", label: "Optimize" },
   { href: "/analytics", label: "Analytics" },
+  { href: "/monte-carlo", label: "Monte Carlo" },
   { href: "/settings", label: "Settings" },
 ];

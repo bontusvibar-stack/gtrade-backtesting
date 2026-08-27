@@ -269,6 +269,30 @@ export function runBacktest(
   const maxConsecLosses = (config.risk as unknown as { maxConsecutiveLosses?: number }).maxConsecutiveLosses ?? Infinity;
   let consecLosses = 0;
 
+  // Session/news filter helpers (Spec 28)
+  function isSessionAllowed(ts: number): boolean {
+    const sess = config.session;
+    if (!sess || !sess.enabled || sess.sessions.length === 0) return true;
+    // Convert ts to hour in sess.timezone (default Asia/Jakarta)
+    const tz = sess.timezone || "Asia/Jakarta";
+    try {
+      const fmt = new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: tz });
+      const hour = Number(fmt.format(new Date(ts)));
+      // Simple mapping: Asia 0-8, London 8-16, New York 13-21 UTC-ish; approximate in local Jakarta time
+      // Jakarta: Asia 07-15, London 14-22, New York 19-03 (overnight), Overlap London+NY 19-22
+      const inAsia = hour >= 7 && hour < 15;
+      const inLondon = hour >= 14 && hour < 22;
+      const inNY = hour >= 19 || hour < 3;
+      const inOverlap = hour >= 19 && hour < 22;
+      const sessionMap: Record<string, boolean> = { asia: inAsia, london: inLondon, new_york: inNY, overlap: inOverlap };
+      return sess.sessions.some((s) => sessionMap[s]);
+    } catch {
+      return true;
+    }
+  }
+
+  let newsWarningEmitted = false;
+
   strategy.initialize?.(ctx);
 
   for (let i = 0; i < candles.length; i++) {
@@ -276,6 +300,12 @@ export function runBacktest(
     const candle = candles[i];
     const day = new Date(candle.timestamp).toISOString().slice(0, 10);
     if ((dailyPnl.get(day) ?? 0) <= -maxDailyLoss) maxDailyLossHit = true;
+
+    // News filter: if enabled but no dataset, emit one warning and never fabricate
+    if (config.news?.enabled && !newsWarningEmitted) {
+      warnings.push("News data unavailable — news filter ignored.");
+      newsWarningEmitted = true;
+    }
 
     // 1. Fill pending order from previous candle (next_open model) or check limit/stop triggers
     const openPend = state.pending;
@@ -431,7 +461,8 @@ export function runBacktest(
     }
 
     // 3. Strategy decision for this candle
-    allowNewEntries = !maxDailyLossHit && trades.length < maxTrades;
+    const sessionOk = isSessionAllowed(candle.timestamp);
+    allowNewEntries = !maxDailyLossHit && trades.length < maxTrades && consecLosses < maxConsecLosses && sessionOk;
     strategy.onCandle(ctx, candle);
 
     // If strategy opened a position with 'close' model, fill immediately at close

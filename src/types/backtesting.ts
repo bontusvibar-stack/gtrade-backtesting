@@ -63,6 +63,19 @@ export interface ExecutionConfig {
   tpSlCollision: TpSlCollision;
 }
 
+export type SessionFilter = "asia" | "london" | "new_york" | "overlap";
+export interface SessionConfig {
+  enabled: boolean;
+  sessions: SessionFilter[];
+  timezone: string; // default Asia/Jakarta per spec 28
+}
+
+export interface NewsFilterConfig {
+  enabled: boolean;
+  avoidMinutesBefore: number;
+  avoidMinutesAfter: number;
+}
+
 export interface BacktestConfig {
   symbol: string;
   marketType?: string;
@@ -72,6 +85,8 @@ export interface BacktestConfig {
   currency: string;
   risk: RiskConfig;
   execution: ExecutionConfig;
+  session?: SessionConfig;
+  news?: NewsFilterConfig;
   strategyId: string;
   strategyVersion: number;
   strategyParameters: Record<string, number | string>;

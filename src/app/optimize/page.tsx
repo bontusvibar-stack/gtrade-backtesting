@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Optimizer } from "@/components/optimize/optimizer";
+import { WalkForwardPanel } from "@/components/optimize/walk-forward-panel";
 
 export default async function OptimizePage() {
   const supabase = await createClient();
@@ -30,8 +31,9 @@ export default async function OptimizePage() {
           performance. Distinguish in-sample vs out-of-sample where architecture permits.
         </p>
       </div>
-      <div className="mt-4">
+      <div className="mt-4 space-y-4">
         <Optimizer datasets={datasets ?? []} />
+        <WalkForwardPanel datasets={datasets ?? []} />
       </div>
     </div>
   );
