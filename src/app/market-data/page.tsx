@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { CsvUpload } from "@/components/market-data/csv-upload";
 import { DemoGenerator } from "@/components/market-data/demo-generator";
+import { OandaFetcher } from "@/components/market-data/oanda-fetcher";
 import { DatasetTable } from "@/components/market-data/dataset-table";
 
 interface DatasetRow {
@@ -41,9 +42,10 @@ export default async function MarketDataPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <CsvUpload />
         <DemoGenerator />
+        <OandaFetcher />
       </div>
 
       <div className="rounded-lg border border-border bg-card">

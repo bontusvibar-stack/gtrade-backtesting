@@ -11,3 +11,7 @@ export {
   generateDemoCandles,
   DEMO_SYMBOLS,
 } from "./demo";
+export {
+  createOandaProvider,
+  createOandaStreamProvider,
+} from "./oanda";
