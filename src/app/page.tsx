@@ -41,18 +41,50 @@ export default function HomePage() {
   const horizontalX = useTransform(scrollYProgress, [0.5, 0.75], ["0%", "-60%"]);
   const pinnedScale = useTransform(scrollYProgress, [0.75, 0.92], [0.9, 1]);
 
-  return (
-    <div ref={containerRef} className="relative bg-[#060a07] text-white overflow-clip">
+return (
+    <div ref={containerRef} className="relative bg-[#050806] text-white overflow-clip">
+      {/* TOP GLOWING AURORA BACKGROUND */}
+      <div className="fixed inset-0 -z-20 bg-gradient-to-b from-emerald-900/30 via-[#050806] to-transparent" />
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] -z-10 rounded-full bg-emerald-500/10 blur-[120px] animate-pulse" style={{ animationDuration: "4s" }} />
+      <div className="fixed top-0 right-0 w-[500px] h-[300px] -z-10 rounded-full bg-green-500/10 blur-[100px]" style={{ animationDuration: "5s" }} />
+      
       {/* GREEN PROGRAMMER BACKGROUND */}
       <div className="fixed inset-0 -z-10 bg-[#050a06]">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/40 via-[#060a07] to-[#050a06]" />
-        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, #10b981 2px, #10b981 3px)`, backgroundSize: "100% 8px" }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/50 via-[#050a06] to-[#050a06]" />
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 2px, #10b981 2px, #10b981 3px)`, backgroundSize: "100% 8px" }} />
         {/* code rain */}
-        <div className="absolute inset-0 opacity-[0.04] text-emerald-400 font-mono text-[10px] leading-[14px] p-4 overflow-hidden select-none">
+        <div className="absolute inset-0 opacity-[0.03] text-emerald-400 font-mono text-[10px] leading-[14px] p-4 overflow-hidden select-none">
           {Array.from({ length: 20 }).map((_, i) => (
             <div key={i} className="whitespace-nowrap">{`const backtest = await engine.run(candles); // G-Backtest v0.2.0  `} {`EMA20 > EMA50 && RSI>50 => BUY  `} {`equity = balance + unrealizedPnL`}</div>
           ))}
         </div>
+      </div>
+
+      {/* BOTTOM GLOWING AURORA BACKGROUND */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] -z-10 rounded-full bg-green-500/10 blur-[120px] animate-pulse" style={{ animationDuration: "3.5s", animationDelay: "1s" }} />
+      <div className="fixed bottom-0 right-0 w-[500px] h-[300px] -z-10 rounded-full bg-emerald-500/10 blur-[100px]" style={{ animationDuration: "4.5s", animationDelay: "0.5s" }} />
+      <div className="fixed bottom-0 left-0 w-[400px] h-[200px] -z-10 rounded-full bg-emerald-400/5 blur-[80px]" />
+
+      {/* FLOATING PARTICLES TOP */}
+      <div className="fixed top-0 left-0 right-0 h-[300px] -z-10 overflow-hidden pointer-events-none">
+        {Array.from({ length: 60 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full bg-emerald-400/20"
+            style={{
+              left: `${(i * 73) % 100}%`,
+              top: `${(i * 47) % 30}%`,
+              width: `${2 + (i % 4)}px`,
+              height: `${2 + (i % 4)}px`,
+            }}
+            animate={{
+              y: [-50, 350, -50],
+              opacity: [0, 0.6, 0],
+              scale: [0.5, 1.2, 0.5],
+            }}
+            transition={{ duration: 8 + (i % 5), repeat: Infinity, delay: i * 0.1, ease: "easeInOut" }}
+          />
+        ))}
       </div>
 
       {/* STARS */}
@@ -70,6 +102,30 @@ export default function HomePage() {
         </div>
       </ParallaxLayer>
 
+      {/* FLOATING GEOMETRIC SHAPES */}
+      <div className="fixed inset-0 -z-5 pointer-events-none overflow-hidden">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute border-emerald-400/10"
+            style={{
+              left: `${(i * 13) % 100}%`,
+              top: `${(i * 23) % 100}%`,
+              width: `${40 + i * 30}px`,
+              height: `${40 + i * 30}px`,
+              borderWidth: "1px",
+              borderRadius: i % 2 === 0 ? "50%" : "12px",
+            }}
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.1, 1],
+              opacity: [0.15, 0.3, 0.15],
+            }}
+            transition={{ duration: 20 + i * 3, repeat: Infinity, delay: i * 1.5 }}
+          />
+        ))}
+      </div>
+
       {/* BANNER LOGO */}
       <motion.div style={{ skewX: skew }} className="relative z-10 border-b border-emerald-900/30 bg-emerald-950/20 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -78,7 +134,7 @@ export default function HomePage() {
               <Terminal className="h-5 w-5 text-black" />
             </div>
             <span className="text-sm font-black tracking-widest text-emerald-300">G-BACKTEST</span>
-            <span className="hidden rounded-full border border-emerald-800 bg-emerald-900/30 px-2 py-0.5 text-[10px] tracking-widest text-emerald-300 md:inline">PROGRAMMER EDITION</span>
+            <span className="hidden rounded-full border border-emerald-800 bg-emerald-950/30 px-2 py-0.5 text-[10px] tracking-widest text-emerald-300 md:inline">PROGRAMMER EDITION</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="hidden text-emerald-300/60 md:inline">v0.2.0 • Next.js 16 + Supabase</span>
@@ -231,11 +287,22 @@ export default function HomePage() {
 
       {/* CTA */}
       <Reveal>
-        <section className="mx-auto max-w-6xl px-6 py-16 text-center">
+        <section className="mx-auto max-w-6xl px-6 py-16 text-center relative z-10">
+          <div className="absolute inset-0 -z-10 rounded-full bg-emerald-500/5 blur-[100px]" />
           <a href="/dashboard" className="inline-block rounded-full bg-emerald-500 px-8 py-3 font-bold text-black hover:bg-emerald-400 transition shadow-[0_0_30px_rgba(16,185,129,0.6)]">Launch G-Backtest Terminal →</a>
           <p className="mt-3 text-xs text-white/30">Dark default • Supabase RLS • Web Worker • Correctness {">"} UI polish</p>
         </section>
       </Reveal>
+
+      {/* BOTTOM GLOWING FOOTER AURORA */}
+      <div className="fixed bottom-0 left-0 right-0 h-[200px] -z-10 pointer-events-none">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[150px] rounded-full bg-emerald-500/8 blur-[80px] animate-pulse" style={{ animationDuration: "3s" }} />
+        <div className="absolute bottom-0 left-1/4 w-[300px] h-[100px] rounded-full bg-green-500/10 blur-[60px]" style={{ animationDuration: "4s", animationDelay: "1s" }} />
+        <div className="absolute bottom-0 right-1/4 w-[300px] h-[100px] rounded-full bg-emerald-400/5 blur-[60px]" style={{ animationDuration: "3.5s", animationDelay: "0.5s" }} />
+      </div>
+
+      {/* FOOTER GLOWING GRADIENT LINE */}
+      <div className="h-1 bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent fixed bottom-0 left-0 right-0 z-10" />
     </div>
   );
 }
