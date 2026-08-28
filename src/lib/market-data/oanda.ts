@@ -15,15 +15,16 @@ const OANDA_TIMEFRAME_MAP: Record<string, string> = {
 
 const OANDA_INSTRUMENT_MAP: Record<string, string> = {
   "XAUUSD": "XAU_USD",
-  "EURUSD": "EUR_USD",
   "GBPUSD": "GBP_USD",
+  "BTCUSD": "BTC_USD",
+  "NQ100": "NAS100_USD",
+  "EURUSD": "EUR_USD",
   "USDJPY": "USD_JPY",
   "AUDUSD": "AUD_USD",
   "USDCAD": "USD_CAD",
   "NZDUSD": "NZD_USD",
   "EURJPY": "EUR_JPY",
   "GBPJPY": "GBP_JPY",
-  "BTCUSD": "BTC_USD",
   "ETHUSD": "ETH_USD",
 };
 
