@@ -4,9 +4,16 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key",
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+  const isPlaceholder = url.includes("placeholder");
+
+  // If Supabase not configured, skip auth check — allow build + show setup message
+  if (isPlaceholder) {
+    return supabaseResponse;
+  }
+
+  const supabase = createServerClient(url, key,
     {
       cookies: {
         getAll() {
