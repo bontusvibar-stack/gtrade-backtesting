@@ -10,10 +10,10 @@ export function Connecting({ onReady }: { onReady?: () => void }) {
 
   useEffect(() => {
     if (idx >= STEPS.length - 1) {
-      const t = setTimeout(() => onReady?.(), 450);
+      const t = setTimeout(() => onReady?.(), 280);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setIdx(i => i + 1), idx === 0 ? 600 : 420);
+    const t = setTimeout(() => setIdx(i => i + 1), 520);
     return () => clearTimeout(t);
   }, [idx, onReady]);
 

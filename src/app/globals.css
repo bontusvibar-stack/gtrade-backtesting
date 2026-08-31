@@ -105,5 +105,9 @@ html.lenis, html.lenis body { height: auto; }
   }
   body {
     @apply bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
+  }
+  .font-mono, .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }

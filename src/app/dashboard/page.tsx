@@ -1,7 +1,7 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { MotionDiv } from "@/components/dashboard/dashboard-motion";
+import { CommandCenter } from "@/components/workspace/CommandCenter";
 
 export default async function DashboardPage() {
   if (!isSupabaseConfigured()) {
@@ -43,111 +43,31 @@ export default async function DashboardPage() {
 
   const hasData = !!lastRun && !!m;
 
+  const recent = ((recentRuns as unknown as { id: string; created_at: string; backtest_configs: { symbol: string; timeframe: string }[] | null; backtest_results: { net_pnl: number }[] | null }[]) ?? []).map((r) => ({
+    id: r.id,
+    created_at: r.created_at,
+    symbol: r.backtest_configs?.[0]?.symbol ?? "—",
+    pnl: Number(r.backtest_results?.[0]?.net_pnl ?? 0),
+  }));
+
   return (
-    <div className="mx-auto max-w-6xl space-y-3 px-4 py-6">
-      <MotionDiv><div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-xs text-white/40">Signed in as {user.email} · premium dark terminal</p>
-        </div>
-        <Link href="/backtest" className="rounded-md bg-white px-3.5 py-1.5 text-sm font-semibold text-black hover:bg-white/90 transition-all hover:scale-105">
-          New Backtest →
-        </Link>
-      </div></MotionDiv>
-
-      <MotionDiv delay={0.05}><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { href: "/backtest", t: "New Backtest", d: "Pilih dataset + LONG" },
-          { href: "/market-data", t: "Market Data", d: "Import CSV / Demo" },
-          { href: "/strategies", t: "Strategies", d: "4 demo + custom" },
-          { href: "/results", t: "Results", d: `${runCount ?? 0} saved` },
-        ].map((x) => (
-          <Link key={x.t} href={x.href} className="group rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:bg-white/[0.04] transition-all hover:scale-[1.02] hover:border-white/15">
-            <p className="text-xs font-semibold text-white group-hover:text-white">{x.t}</p>
-            <p className="mt-1 text-xs text-white/40">{x.d}</p>
-          </Link>
-        ))}
-      </div></MotionDiv>
-
-      <MotionDiv delay={0.1}><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { k: "Datasets", v: String(dsCount ?? 0), sub: "di Market Data" },
-          { k: "Saved runs", v: String(runCount ?? 0), sub: "di Results" },
-          { k: "Last P&L", v: m ? Number(m.net_pnl).toFixed(2) : "—", tone: Number(m?.net_pnl ?? 0) >= 0 ? "profit" : "loss", sub: cfg?.[0] ? `${cfg[0].symbol} ${cfg[0].timeframe}` : "belum ada" },
-          { k: "Win Rate", v: m?.win_rate !== null && m?.win_rate !== undefined ? `${Number(m.win_rate).toFixed(1)}%` : "—", sub: m ? `${m.trade_count} trades` : "—" },
-        ].map((c, i) => (
-          <MotionDiv key={c.k} delay={0.12 + i * 0.05}><div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:border-white/15 transition-colors">
-            <p className="text-[10px] uppercase tracking-widest text-white/35">{c.k}</p>
-            <p className={`mt-1 font-mono text-base font-semibold tabular-nums ${c.tone === "profit" ? "text-emerald-400" : c.tone === "loss" ? "text-red-400" : "text-white"}`}>{c.v}</p>
-            <p className="text-xs text-white/30">{c.sub}</p>
-          </div></MotionDiv>
-        ))}
-      </div></MotionDiv>
-
-      <MotionDiv delay={0.2}><div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:border-white/10 transition-colors">
-        <h2 className="text-xs font-semibold tracking-wide text-white/70">Performance</h2>
-        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {[
-            { k: "Return", v: m?.total_return !== null && m?.total_return !== undefined ? `${Number(m.total_return).toFixed(2)}%` : "—" },
-            { k: "PF", v: m?.profit_factor !== null && m?.profit_factor !== undefined ? Number(m.profit_factor).toFixed(2) : "—" },
-            { k: "Sharpe", v: m?.sharpe !== null && m?.sharpe !== undefined ? Number(m.sharpe).toFixed(2) : "—" },
-            { k: "Max DD", v: m?.max_drawdown_pct !== null && m?.max_drawdown_pct !== undefined ? `${Number(m.max_drawdown_pct).toFixed(1)}%` : "—" },
-            { k: "Trades", v: m ? String(m.trade_count) : "—" },
-            { k: "Engine", v: hasData ? "v0.2.0" : "—" },
-          ].map((x) => (
-            <div key={x.k} className="rounded-lg bg-white/[0.04] px-2.5 py-2 hover:bg-white/[0.06] transition-colors">
-              <p className="text-[10px] uppercase tracking-wide text-white/30">{x.k}</p>
-              <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums text-white/80">{x.v}</p>
-            </div>
-          ))}
-        </div>
-        {!hasData && <p className="mt-2 text-xs text-white/25">Jalankan backtest sekali untuk mengisi panel ini.</p>}
-      </div></MotionDiv>
-
-      <MotionDiv delay={0.25}><div className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 lg:col-span-2 hover:border-white/10 transition-colors">
-          <h2 className="text-xs font-semibold tracking-wide text-white/70">Equity · Drawdown · Monthly</h2>
-          {!hasData ? (
-            <div className="mt-3 grid gap-2">
-              <div className="h-24 rounded-lg bg-white/[0.03] p-2">
-                <div className="h-full w-full rounded bg-gradient-to-r from-emerald-500/10 via-white/[0.04] to-transparent animate-pulse" />
-                <p className="mt-1 text-center text-xs text-white/25">Equity curve muncul setelah Run Backtest</p>
-              </div>
-              <div className="h-16 rounded-lg bg-white/[0.03] p-2">
-                <div className="h-full w-full rounded bg-gradient-to-r from-red-500/10 via-white/[0.04] to-transparent animate-pulse" />
-              </div>
-              <div className="grid grid-cols-8 gap-1">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-8 rounded bg-white/[0.04] animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-white/40">Lihat Analytics untuk equity/drawdown/monthly penuh.</p>
-          )}
-          <Link href="/analytics" className="mt-2 inline-block text-xs text-white/50 underline hover:text-white">
-            Open Analytics →
-          </Link>
-        </div>
-
-        <div className="rounded-xl border border-white/[0.07] bg-[#151515] p-3 hover:border-white/10 transition-colors">
-          <h2 className="text-xs font-semibold tracking-wide text-white/70">Recent backtests</h2>
-          {!recentRuns || recentRuns.length === 0 ? (
-            <p className="mt-2 text-sm text-white/30">Belum ada. Klik New Backtest → pilih Long & Hold → Run.</p>
-          ) : (
-            <div className="mt-2 space-y-2">
-              {(recentRuns as unknown as { id: string; created_at: string; backtest_configs: { symbol: string; timeframe: string }[] | null; backtest_results: { net_pnl: number }[] | null }[]).map((r) => (
-                <Link key={r.id} href={`/results/${r.id}`} className="flex items-center justify-between rounded-lg bg-white/[0.04] px-2.5 py-2 hover:bg-white/[0.07] transition-all hover:translate-x-1">
-                  <span className="text-xs font-mono text-white/60">{r.id.slice(0, 6)} · {r.backtest_configs?.[0]?.symbol ?? "—"}</span>
-                  <span className={`text-xs font-mono tabular-nums ${Number(r.backtest_results?.[0]?.net_pnl ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{r.backtest_results?.[0] ? Number(r.backtest_results[0].net_pnl).toFixed(0) : "—"}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </div></MotionDiv>
-
-      <p className="text-[10px] text-white/20">Historical backtesting does not guarantee future performance.</p>
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      <CommandCenter
+        userEmail={user.email ?? undefined}
+        stats={{
+          dsCount: dsCount ?? 0,
+          runCount: runCount ?? 0,
+          lastPnl: m ? Number(m.net_pnl).toFixed(2) : null,
+          winRate: m?.win_rate != null ? `${Number(m.win_rate).toFixed(1)}%` : null,
+          lastSymbol: cfg?.[0] ? `${cfg[0].symbol} ${cfg[0].timeframe}` : null,
+          totalReturn: m?.total_return != null ? `${Number(m.total_return).toFixed(2)}%` : null,
+          profitFactor: m?.profit_factor != null ? Number(m.profit_factor).toFixed(2) : null,
+          sharpe: m?.sharpe != null ? Number(m.sharpe).toFixed(2) : null,
+          maxDd: m?.max_drawdown_pct != null ? `${Number(m.max_drawdown_pct).toFixed(1)}%` : null,
+          hasData,
+        }}
+        recentRuns={recent}
+      />
     </div>
   );
 }

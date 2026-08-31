@@ -132,8 +132,15 @@ export function AIAgentPanel() {
                   ? "ERROR"
                   : "READY"}
               </p>
-              <p className="text-[11px] text-white/50">
-                {aiAgent.currentTask || "Awaiting command..."}
+          <p className="text-[11px] text-white/50 min-h-[16px]">
+                {aiAgent.currentTask ? (
+                  <span className="inline-flex items-center gap-1">
+                    {aiAgent.currentTask}
+                    <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-emerald-400" />
+                  </span>
+                ) : (
+                  "Awaiting command...  "
+                )}
               </p>
             </div>
           </div>
@@ -233,7 +240,7 @@ export function AIAgentPanel() {
                       )}
                     </div>
                     {activity.details && (
-                      <p className="mt-1 text-[11px] text-white/40">
+                      <p className="mt-1 text-[11px] text-white/40 blur-[0.3px] opacity-90">
                         {activity.details}
                       </p>
                     )}
