@@ -37,7 +37,7 @@ export function TopBar() {
   const workspaceLabel = getWorkspaceLabel(activeWorkspace);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-80 h-14 border-b border-emerald-900/20 bg-[#050505]/95 backdrop-blur-sm transition-all duration-300" style={{ left: '220px' }}>
+    <header className="fixed top-0 right-0 z-80 h-14 border-b border-white/[0.06] bg-[#050505]/95 backdrop-blur-sm transition-all duration-300" style={{ left: '230px' }}>
       <div className="flex h-full items-center justify-between px-4">
         {/* Left: Workspace breadcrumb */}
         <div className="flex items-center gap-3">
@@ -61,26 +61,12 @@ export function TopBar() {
           </motion.div>
         </div>
 
-        {/* Center: AI Status */}
-        <div className="flex items-center gap-3">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20"
-          >
-            <div className={`relative flex h-1.5 w-1.5 rounded-full ${
-              aiAgent.status === 'analyzing' || aiAgent.status === 'executing'
-                ? 'bg-emerald-400 animate-pulse'
-                : aiAgent.status === 'error'
-                ? 'bg-red-400'
-                : 'bg-emerald-400'
-            }`} />
-            <span className="text-[11px] font-medium text-emerald-300">
-              {aiAgent.status === 'analyzing' ? 'ANALYZING' :
-               aiAgent.status === 'executing' ? 'EXECUTING' :
-               aiAgent.status === 'error' ? 'ERROR' : 'READY'}
-            </span>
-          </motion.div>
+        {/* Center: Ambient system status */}
+        <div className="flex items-center gap-2 text-xs">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+          <span className="tracking-wide text-white/50">SYSTEM OPERATIONAL</span>
+          <span className="hidden md:inline text-white/20">•</span>
+          <span className="hidden md:inline tracking-wide text-emerald-300/70">{aiAgent.status === 'analyzing' ? 'ANALYZING' : aiAgent.status === 'executing' ? 'EXECUTING' : 'READY'}</span>
         </div>
 
         {/* Right: Command Bar trigger + Notifications + User */}
@@ -98,25 +84,24 @@ export function TopBar() {
             <span className="hidden text-white/50 md:inline">Ask GTrade Agent</span>
           </motion.button>
 
+          <motion.a href="/backtest" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="hidden md:inline-flex items-center rounded-full bg-amber-500 px-4 py-1.5 text-xs font-semibold text-black shadow-[0_0_16px_rgba(245,158,11,0.35)] hover:bg-amber-400">
+            Start New Session
+          </motion.a>
+
           {/* Notifications */}
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-white/50 hover:bg-white/5 hover:text-white transition-colors"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/10 transition-colors"
+            aria-label="Notifications"
           >
-            <Bell className="w-5 h-5 text-white/50" />
-            <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-black">3</span>
+            <Bell className="w-4 h-4" />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black">3</span>
           </motion.button>
 
-          {/* User Menu */}
-          <motion.div className="relative">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/20 to-emerald-900/20 border border-emerald-500/30"
-            >
-              <Sparkles className="w-5 h-5 text-emerald-400" />
-            </motion.button>
+          {/* User avatar */}
+          <motion.div whileHover={{ scale: 1.03 }} className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-xs font-bold text-black">
+            A
           </motion.div>
         </div>
       </div>

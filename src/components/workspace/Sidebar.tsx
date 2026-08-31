@@ -28,25 +28,25 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: "COMMAND CENTER",
+    title: "HOME",
     items: [
-      { href: "/dashboard", label: "Overview", icon: <LayoutDashboard className="w-4 h-4" /> },
-      { href: "/backtest", label: "Backtest", icon: <Beaker className="w-4 h-4" /> },
-      { href: "/manual", label: "Manual", icon: <Activity className="w-4 h-4" /> },
+      { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
+      { href: "/analytics", label: "Stats", icon: <BarChart3 className="w-4 h-4" /> },
+      { href: "/journal", label: "Trade Journal", icon: <Activity className="w-4 h-4" /> },
     ],
   },
   {
     title: "STRATEGY & EDGE",
     items: [
-      { href: "/strategies", label: "My Strategies", icon: <Brain className="w-4 h-4" /> },
-      { href: "/strategies/builder", label: "Strategy Builder", icon: <Terminal className="w-4 h-4" /> },
+      { href: "/strategies/ai", label: "AI Analyst", icon: <Brain className="w-4 h-4" /> },
+      { href: "/strategies", label: "My Strategies", icon: <Terminal className="w-4 h-4" /> },
       { href: "/strategies/public", label: "Public Strategies", icon: <Search className="w-4 h-4" /> },
     ],
   },
   {
     title: "PRACTICE & TEST",
     items: [
-      { href: "/backtest/sessions", label: "Backtest Sessions", icon: <BarChart3 className="w-4 h-4" /> },
+      { href: "/backtest", label: "Backtesting Sessions", icon: <Beaker className="w-4 h-4" /> },
       { href: "/challenges/historical", label: "Historical Challenges", icon: <Zap className="w-4 h-4" /> },
       { href: "/challenges/daily", label: "Daily Challenge", icon: <TrendingUp className="w-4 h-4" /> },
     ],
@@ -74,21 +74,21 @@ export function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 z-70 h-full border-r border-emerald-900/20 bg-[#121212] transition-all duration-300 ease-out"
-      style={{ width: sidebarCollapsed ? '64px' : '220px' }}
+      className="fixed left-0 top-0 z-70 h-full border-r border-white/[0.06] bg-[#121212] transition-all duration-300 ease-out"
+      style={{ width: sidebarCollapsed ? '64px' : '230px' }}
     >
       {/* Top Brand */}
-      <div className="flex h-16 items-center justify-between border-b border-emerald-900/30 px-4">
+      <div className="flex h-16 items-center justify-between border-b border-white/[0.06] px-4">
         <AnimatePresence mode="wait">
           {!sidebarCollapsed && (
-            <motion.span
+            <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              className="text-xs font-bold tracking-widest text-emerald-300"
             >
-              GTRADE
-            </motion.span>
+              <p className="text-xs font-bold tracking-widest text-white">GTRADE</p>
+              <p className="text-[10px] tracking-widest text-white/40">BACKTEST</p>
+            </motion.div>
           )}
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -116,35 +116,29 @@ export function Sidebar() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: sectionIndex * 0.05, duration: 0.3 }}
               >
-                <p className="px-3 mb-2 text-[10px] font-semibold tracking-widest text-emerald-400/60 uppercase">
+                <p className="px-3 mb-2 text-[10px] font-semibold tracking-widest text-white/30 uppercase">
                   {section.title}
                 </p>
                 <div className="space-y-1">
                   {section.items.map((item) => {
                     const active = isActive(item.href);
+                    const isBonus = item.label === "Trade Live";
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setActiveWorkspace(activeWorkspace)}
-                        className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
+                        className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
                           active
-                            ? "bg-emerald-500/10 text-emerald-300 border-l-2 border-emerald-400"
-                            : "text-white/70 hover:bg-white/5 hover:text-white"
+                            ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                            : "text-white/60 hover:bg-white/[0.04] hover:text-white"
                         }`}
                       >
-                        <span className="flex h-5 w-5 items-center justify-center text-white/60 group-hover:text-white transition-colors">
+                        <span className={`flex h-5 w-5 items-center justify-center transition-colors ${active ? "text-amber-400" : "text-white/40"}`}>
                           {item.icon}
                         </span>
-                        <span className="truncate">{item.label}</span>
-                        {active && (
-                          <motion.div
-                            initial={{ opacity: 0, width: 0 }}
-                            animate={{ opacity: 1, width: 4 }}
-                            exit={{ opacity: 0, width: 0 }}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-4 bg-emerald-400 rounded-r-full"
-                          />
-                        )}
+                        <span className="truncate flex-1">{item.label}</span>
+                        {isBonus && <span className="text-[9px] font-bold tracking-widest text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5">BONUS</span>}
                       </Link>
                     );
                   })}
@@ -154,30 +148,30 @@ export function Sidebar() {
           </>
         )}
 
-        <div className="border-t border-emerald-900/30 my-2" />
+        <div className="border-t border-white/[0.06] my-2" />
         
         {!sidebarCollapsed && (
           <Link
             href="/settings"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/50 hover:bg-white/[0.04] hover:text-white transition-colors"
           >
-            <Settings className="w-4 h-4 text-white/60" />
+            <Settings className="w-4 h-4 text-white/40" />
             <span>Settings</span>
           </Link>
         )}
       </nav>
 
       {/* AI Agent Footer */}
-      <div className="border-t border-emerald-900/30 p-3">
+      <div className="border-t border-white/[0.06] p-3">
         <div className="flex items-center gap-2 mb-2">
           <div className={`relative flex h-2 w-2 rounded-full ${
             aiAgent.status === 'analyzing' || aiAgent.status === 'executing'
-              ? 'bg-emerald-400 animate-pulse'
+              ? 'bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.6)]'
               : aiAgent.status === 'error'
               ? 'bg-red-400'
               : 'bg-emerald-400'
           }`} />
-          <span className="text-[10px] font-medium tracking-widest text-emerald-300 uppercase">
+          <span className="text-[10px] font-medium tracking-widest text-white/60 uppercase">
             AI AGENT
           </span>
         </div>
@@ -194,12 +188,12 @@ export function Sidebar() {
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${aiAgent.progress}%` }}
-            className="mt-2 h-1 rounded-full bg-emerald-400/20 overflow-hidden"
+            className="mt-2 h-1 rounded-full bg-amber-500/20 overflow-hidden"
           >
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: '100%' }}
-              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600"
+              className="h-full bg-gradient-to-r from-amber-400 to-orange-500"
               transition={{ duration: 0.5, ease: 'easeOut' }}
             />
           </motion.div>

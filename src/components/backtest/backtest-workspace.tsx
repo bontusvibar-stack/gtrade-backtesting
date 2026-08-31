@@ -7,6 +7,7 @@ import { runBacktest, type RunResult } from "@/lib/backtesting/engine";
 import { runBacktestInWorker, canUseWorker } from "@/lib/backtesting/worker-client";
 import { DEMO_STRATEGIES, getStrategy, getAllStrategies } from "@/lib/backtesting";
 import { CandlestickChart } from "@/components/charts/candlestick-chart";
+import { ExecutionPanel, MagnetBadge } from "@/components/charts/ExecutionPanel";
 import { MetricsPanel } from "@/components/backtest/metrics-panel";
 import { EquityChart, DrawdownChart } from "@/components/backtest/equity-chart";
 import { TradeTable } from "@/components/backtest/trade-table";
@@ -377,11 +378,13 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
 
         {/* Center: Chart */}
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className={`${cardCls} p-2`}>
+          <div className={`${cardCls} p-2 relative overflow-hidden`}>
+            {/* Watermark engraving background */}
+            <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, #fff 20px, #fff 21px)` }} />
             {!result ? (
               <div className="flex min-h-[420px] flex-col gap-3 p-4">
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] p-3">
-                  <p className="text-xs font-semibold tracking-wide text-white/80">Cara entry LONG (3 langkah)</p>
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                  <p className="text-xs font-semibold tracking-wide text-amber-300">Cara entry LONG (3 langkah)</p>
                   <div className="mt-2 grid gap-2 sm:grid-cols-3">
                     <div className="rounded-lg bg-white/[0.04] p-2.5">
                       <p className="text-[10px] font-bold tracking-widest text-white/30">LANGKAH 1</p>
@@ -399,10 +402,10 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
                       <p className="text-xs leading-relaxed text-white/40">Klik tombol putih <span className="text-white">Run Backtest</span> di kanan atas. Chart + Trades muncul di bawah.</p>
                     </div>
                   </div>
-                  <button onClick={onRun} className="mt-3 w-full rounded-md bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/90">
+                  <button onClick={onRun} className="mt-3 w-full rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-black hover:bg-amber-400 shadow-[0_0_16px_rgba(245,158,11,0.3)]">
                     ▶ Run Long & Hold Sekarang
                   </button>
-                  <p className="mt-2 text-center text-[10px] text-white/25">Setelah Run: lihat panah hijau B di chart = entry LONG.</p>
+                  <p className="mt-2 text-center text-[10px] text-white/25">Setelah Run: lihat panah amber B di chart = entry LONG.</p>
                 </div>
                 <div className="flex-1 rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3">
                   <p className="text-xs font-medium text-white/50">Preview chart (akan terrender setelah Run)</p>
@@ -410,7 +413,13 @@ export function BacktestWorkspace({ datasets }: { datasets: DatasetOption[] }) {
                 </div>
               </div>
             ) : (
-              <CandlestickChart candles={candles} trades={result.trades} />
+              <div className="relative">
+                <CandlestickChart candles={candles} trades={result.trades} />
+                <div className="absolute top-3 right-3 hidden xl:block z-10">
+                  <ExecutionPanel />
+                </div>
+                <MagnetBadge />
+              </div>
             )}
           </div>
 

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { BacktestWorkspace, type DatasetOption } from "@/components/backtest/backtest-workspace";
+import { BacktestPageClient } from "@/components/backtest/BacktestPageClient";
+import type { DatasetOption } from "@/components/backtest/backtest-workspace";
 
 interface DatasetRow {
   id: string;
@@ -34,11 +35,7 @@ export default async function BacktestPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="text-xl font-semibold tracking-tight">Backtest Workspace</h1>
-      <p className="mt-2 mb-6 text-sm text-muted-foreground">
-        Configure and run a backtest against historical market data.
-      </p>
-      <BacktestWorkspace datasets={datasets} />
+      <BacktestPageClient datasets={datasets} />
     </div>
   );
 }
