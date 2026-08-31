@@ -31,11 +31,14 @@ export interface WorkspaceState {
   activeWorkspace: WorkspaceId;
   sidebarCollapsed: boolean;
   commandBarOpen: boolean;
+  agentPanelOpen: boolean;
   aiAgent: AIState;
   setActiveWorkspace: (id: WorkspaceId) => void;
   toggleSidebar: () => void;
   toggleCommandBar: () => void;
   setCommandBarOpen: (open: boolean) => void;
+  toggleAgentPanel: () => void;
+  setAgentPanelOpen: (open: boolean) => void;
   setAIStatus: (status: AIStatus) => void;
   setAICurrentTask: (task: string) => void;
   setAIProgress: (progress: number) => void;
@@ -58,12 +61,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       activeWorkspace: 'command-center',
       sidebarCollapsed: false,
       commandBarOpen: false,
+      agentPanelOpen: true,
       aiAgent: initialAIState,
 
       setActiveWorkspace: (id) => set({ activeWorkspace: id }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       toggleCommandBar: () => set((s) => ({ commandBarOpen: !s.commandBarOpen })),
       setCommandBarOpen: (open) => set({ commandBarOpen: open }),
+      toggleAgentPanel: () => set((s) => ({ agentPanelOpen: !s.agentPanelOpen })),
+      setAgentPanelOpen: (open) => set({ agentPanelOpen: open }),
 
       setAIStatus: (status) => set((s) => ({ aiAgent: { ...s.aiAgent, status } })),
       setAICurrentTask: (task) => set((s) => ({ aiAgent: { ...s.aiAgent, currentTask: task } })),
@@ -91,6 +97,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         activeWorkspace: s.activeWorkspace,
+        agentPanelOpen: s.agentPanelOpen,
       }),
     }
   )

@@ -100,9 +100,15 @@ export function TopBar() {
           </motion.button>
 
           {/* User avatar */}
-          <motion.div whileHover={{ scale: 1.03 }} className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-xs font-bold text-black">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => useWorkspaceStore.getState().toggleAgentPanel()}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-orange-600 text-xs font-bold text-black"
+            aria-label="Toggle agent panel"
+          >
             A
-          </motion.div>
+          </motion.button>
         </div>
       </div>
     </header>

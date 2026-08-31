@@ -15,9 +15,10 @@ const quickActions = [
 ];
 
 export function AIAgentPanel() {
-  const { aiAgent, resetAI, clearAIActivities, sidebarCollapsed } = useWorkspaceStore();
-  const [expanded, setExpanded] = useState(true);
+  const { aiAgent, resetAI, clearAIActivities, agentPanelOpen, setAgentPanelOpen } = useWorkspaceStore();
   const [inputValue, setInputValue] = useState("");
+
+  if (!agentPanelOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,15 +67,13 @@ export function AIAgentPanel() {
     handleSubmit(new Event("submit") as unknown as React.FormEvent);
   };
 
-  if (sidebarCollapsed) return null;
-
   return (
     <motion.aside
-      initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 360, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="fixed right-0 top-0 z-60 h-full border-l border-emerald-900/20 bg-[#0a0a0a] flex flex-col overflow-hidden"
+      initial={{ x: 360, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: 360, opacity: 0 }}
+      transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+      className="fixed right-0 top-0 z-60 h-full border-l border-emerald-900/20 bg-[#0a0a0a] flex flex-col overflow-hidden shadow-2xl"
       style={{ width: "360px" }}
     >
       <div className="flex h-14 items-center justify-between border-b border-emerald-900/30 px-4">
@@ -102,6 +101,15 @@ export function AIAgentPanel() {
             aria-label="Reset agent"
           >
             <Zap className="w-4 h-4" />
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setAgentPanelOpen(false)}
+            className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label="Close agent panel"
+          >
+            <X className="w-4 h-4" />
           </motion.button>
         </div>
       </div>

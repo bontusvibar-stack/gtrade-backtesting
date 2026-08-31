@@ -14,7 +14,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const { sidebarCollapsed } = useWorkspaceStore();
+  const { sidebarCollapsed, agentPanelOpen, setAgentPanelOpen } = useWorkspaceStore();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -31,12 +31,21 @@ export function AppShell({ children }: AppShellProps) {
       <Sidebar />
       <TopBar />
       <CommandBar />
-      <div className="transition-all duration-300" style={{ marginLeft: sidebarCollapsed ? 64 : 230, marginTop: 56, marginRight: 0 }}>
+      <div className="transition-all duration-300" style={{ marginLeft: sidebarCollapsed ? 64 : 230, marginTop: 56, marginRight: agentPanelOpen ? 360 : 0 }}>
         <main className="min-h-[calc(100vh-56px)] pb-16 md:pb-0">{children}</main>
       </div>
       <div className="hidden xl:block">
         <AIAgentPanel />
       </div>
+      {!agentPanelOpen && (
+        <button
+          onClick={() => setAgentPanelOpen(true)}
+          className="hidden xl:flex fixed right-4 bottom-4 z-40 items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500 px-4 py-2 text-xs font-semibold text-black shadow-lg hover:bg-amber-400 transition"
+          aria-label="Open agent panel"
+        >
+          <span className="h-2 w-2 rounded-full bg-black animate-pulse" /> Open Agent
+        </button>
+      )}
       <MobileNav />
     </div>
   );
