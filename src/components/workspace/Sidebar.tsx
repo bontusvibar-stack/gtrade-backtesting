@@ -31,6 +31,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "HOME",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
+      { href: "/tradingview", label: "TradingView", icon: <Activity className="w-4 h-4" /> },
       { href: "/analytics", label: "Stats", icon: <BarChart3 className="w-4 h-4" /> },
       { href: "/journal", label: "Trade Journal", icon: <Activity className="w-4 h-4" /> },
     ],

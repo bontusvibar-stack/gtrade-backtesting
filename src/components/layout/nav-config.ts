@@ -8,6 +8,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/tradingview", label: "TradingView" },
   { href: "/backtest", label: "Backtest" },
   { href: "/manual", label: "Manual" },
   { href: "/strategies", label: "Strategies" },
